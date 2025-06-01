@@ -34,30 +34,24 @@ func (s *Storage) Init(ctx context.Context) error {
 		},
 		{
 			table: tablePasswords,
-			query: queryWithTable("CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, login BLOB, password BLOB, meta BLOB)",
+			query: queryWithTable("CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, uid INTEGER NOT NULL, login BLOB, password BLOB, meta BLOB)",
 				tablePasswords),
 		},
 		{
 			table: tableTexts,
-			query: queryWithTable("CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, text BLOB, meta BLOB)",
+			query: queryWithTable("CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, uid INTEGER NOT NULL, text BLOB, meta BLOB)",
 				tableTexts),
 		},
 		{
 			table: tableBins,
-			query: queryWithTable("CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, data BLOB, meta BLOB)",
+			query: queryWithTable("CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, uid INTEGER NOT NULL, data BLOB, meta BLOB)",
 				tableBins),
 		},
 		{
 			table: tableBanks,
-			query: queryWithTable("CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, number BLOB, date BLOB, cvv BLOB, meta BLOB)",
+			query: queryWithTable("CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, uid, INTEGER NOT NULL, number BLOB, date BLOB, cvv BLOB, meta BLOB)",
 				tableBanks),
 		},
-	}
-	for _, t := range []table{tablePasswordsMap, tableTextsMap, tableBinsMap, tableBanksMap} {
-		queries = append(queries, query{
-			table: t,
-			query: queryWithTable("CREATE TABLE IF NOT EXISTS %s(id INTEGER, uid INTEGER)", t),
-		})
 	}
 	for _, q := range queries {
 		if _, err := s.db.ExecContext(ctx, q.query); err != nil {
@@ -71,53 +65,59 @@ func (s *Storage) Close() error {
 	return s.db.Close()
 }
 
-func (s *Storage) List(ctx context.Context, uid models.UserID) ([]models.RecordsEncrypted, error) {
-	rec := make(map[models.RecordType]models.Encrypted)
-	recs := make([]models.RecordsEncrypted, 0)
-	for _, r := range []models.RecordType{
-		models.RecordPassword,
-		models.RecordText,
-		models.RecordBin,
-		models.RecordBank,
-	} {
-		m, err := s.getMap(ctx, uid, r)
-		if err != nil {
-			return nil, err
-		}
-		dataTable := tables(r).record
-		q := query{
-			table: dataTable,
-			query: queryWithTable("SELECT COUNT(*) FROM %s WHERE uid=?", dataTable),
-			args:  nil,
-		}
+func (s *Storage) List(ctx context.Context, uid models.UserID) (models.RecordsEncrypted, error) {
+	var recs models.RecordsEncrypted
+	passwords, err := s.getPasswords(ctx, uid)
+	if err != nil {
+		return recs, err
 	}
+	recs.Password = passwords
+	return recs, nil
 }
 
 func (s *Storage) Get(ctx context.Context, user models.UserID, t models.RecordType,
-	id models.ID) (*models.RecordEncrypted, error) {
-	// TODO implement me
-	panic("implement me")
+	id models.ID) (models.RecordEncrypted, error) {
+	var rec models.RecordEncrypted
+	switch t {
+	case models.RecordPassword:
+		passwords, err := s.getPasswords(ctx, user)
+		if err != nil || len(passwords) != 1 {
+			return rec, err
+		}
+		rec.Password = passwords[0]
+		return rec, nil
+	default:
+		return rec, errors.New("invalid record type")
+	}
 }
 
-func (s *Storage) Delete(ctx context.Context, user models.UserID, t models.RecordType, id models.ID) error {
-	// TODO implement me
-	panic("implement me")
+func (s *Storage) Delete(ctx context.Context, uid models.UserID, t models.RecordType, id models.ID) error {
+	switch t {
+	case models.RecordPassword:
+		return s.delPassword(ctx, uid, models.Password{ID: id})
+	default:
+		return errors.New("invalid record type")
+	}
 }
 
-func (s *Storage) Update(ctx context.Context, user models.UserID, t models.RecordType, id models.ID,
+func (s *Storage) Update(ctx context.Context, uid models.UserID, t models.RecordType, id models.ID,
 	record models.RecordEncrypted) error {
-	// TODO implement me
-	panic("implement me")
+	switch t {
+	case models.RecordPassword:
+		return s.updatePassword(ctx, uid, id, record.Password.Login, record.Password.Password, record.Password.Meta)
+	default:
+		return errors.New("invalid record type")
+	}
 }
 
-func (s *Storage) Add(ctx context.Context, userID models.UserID, t models.RecordType,
+func (s *Storage) Add(ctx context.Context, uid models.UserID, t models.RecordType,
 	record models.RecordEncrypted) error {
-	if ok, err := s.IsUserExist(ctx, userID); err != nil || !ok {
-		return fmt.Errorf("user id %q not exist or error: %w", userID, err)
+	if ok, err := s.IsUserExist(ctx, uid); err != nil || !ok {
+		return fmt.Errorf("user id %q not exist or error: %w", uid, err)
 	}
 	switch t {
 	case models.RecordPassword:
-		return s.addPassword(ctx, userID, record.Password.Login, record.Password.Password, record.Password.Meta)
+		return s.addPassword(ctx, uid, record.Password.Login, record.Password.Password, record.Password.Meta)
 	default:
 		return fmt.Errorf("invalid record type: %q", t)
 	}
@@ -125,12 +125,11 @@ func (s *Storage) Add(ctx context.Context, userID models.UserID, t models.Record
 }
 
 func (s *Storage) IsExist(ctx context.Context, uid models.UserID, t models.RecordType, id models.ID) (bool, error) {
-	tableName := tables(t).record
+	tableName := tables(t)
 	if tableName == tableUnknown {
 		return false, fmt.Errorf("invalid record type: %q", t.String())
 	}
 	q := query{
-		table: tableName,
 		query: queryWithTable("SELECT COUNT(*) FROM %s WHERE id = ?", tableName),
 		args:  []interface{}{id},
 	}
@@ -150,29 +149,27 @@ func (s *Storage) IsExist(ctx context.Context, uid models.UserID, t models.Recor
 }
 
 func (s *Storage) isOwner(ctx context.Context, uid models.UserID, t models.RecordType, id models.ID) (bool, error) {
-	tableName := tables(t).recordMap
+	tableName := tables(t)
 	if tableName == tableUnknown {
 		return false, fmt.Errorf("invalid record type: %q", t.String())
 	}
 	q := query{
-		table: tableName,
-		query: queryWithTable("SELECT COUNT(*) FROM %s WHERE id = ? AND uid = ?", tableName),
+		query: queryWithTable("SELECT uid FROM %s WHERE id = ?", tableName),
 		args:  []interface{}{id, uid},
 	}
-	var count int
-	if err := s.db.QueryRowContext(ctx, q.query, q.args...).Scan(&count); err != nil {
+	var realUID int
+	if err := s.db.QueryRowContext(ctx, q.query, q.args...).Scan(&realUID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		} else {
 			return false, err
 		}
 	}
-	return count > 0, nil
+	return realUID == int(uid), nil
 }
 
 func (s *Storage) Users(ctx context.Context) ([]*models.User, error) {
 	q := query{
-		table: tableUsers,
 		query: queryWithTable("SELECT id, cn FROM %s ORDER BY id", tableUsers),
 	}
 	users := make([]*models.User, 0)
@@ -203,7 +200,6 @@ func (s *Storage) Users(ctx context.Context) ([]*models.User, error) {
 
 func (s *Storage) NewUser(ctx context.Context, cn string) (*models.UserID, error) {
 	q := query{
-		table: tableUsers,
 		query: queryWithTable("INSERT INTO %s(cn) VALUES (?) RETURNING id", tableUsers),
 		args:  []interface{}{cn},
 	}
@@ -217,7 +213,6 @@ func (s *Storage) NewUser(ctx context.Context, cn string) (*models.UserID, error
 
 func (s *Storage) IsUserExist(ctx context.Context, user models.UserID) (bool, error) {
 	q := query{
-		table: tableUsers,
 		query: queryWithTable("SELECT COUNT(*) FROM %s WHERE id = ?", tableUsers),
 		args:  []interface{}{user},
 	}
@@ -230,7 +225,6 @@ func (s *Storage) IsUserExist(ctx context.Context, user models.UserID) (bool, er
 
 func (s *Storage) userIDbyCn(ctx context.Context, cn string) (models.UserID, error) {
 	q := query{
-		table: tableUsers,
 		query: queryWithTable("SELECT id FROM %s WHERE cn = ?", tableUsers),
 		args:  []interface{}{cn},
 	}
@@ -248,100 +242,79 @@ func (s *Storage) userIDbyCn(ctx context.Context, cn string) (models.UserID, err
 
 func (s *Storage) addPassword(ctx context.Context, uid models.UserID, login, password, meta []byte) error {
 	q := query{
-		table: tablePasswords,
-		query: queryWithTable("INSERT INTO %s(login, password, meta) VALUES (?, ?, ?) RETURNING id", tablePasswords),
-		args:  []interface{}{login, password, meta},
+		query: queryWithTable("INSERT INTO %s(uid, login, password, meta) VALUES (?, ?, ?, ?)", tablePasswords),
+		args:  []interface{}{uid, login, password, meta},
 	}
-	var id int
-	if err := s.db.QueryRowContext(ctx, q.query, q.args...).Scan(&id); err != nil {
+	if _, err := s.db.ExecContext(ctx, q.query, q.args...); err != nil {
 		return fmt.Errorf("failed add password for userID %d: %w", uid, err)
-	}
-	if err := s.addMap(ctx, models.ID(id), uid, tablePasswordsMap); err != nil {
-		return fmt.Errorf("failed add mapping password for userID %d: %w", uid, err)
 	}
 	return nil
 }
 
 func (s *Storage) delPassword(ctx context.Context, uid models.UserID, password models.Password) error {
-	if err := s.delMap(ctx, password.ID, uid, tablePasswordsMap); err != nil {
-		return err
-	}
 	q := query{
-		table: tablePasswords,
-		query: queryWithTable("DELETE FROM %s WHERE id = ?", tablePasswords),
-		args:  []interface{}{password.ID},
+		query: queryWithTable("DELETE FROM %s WHERE id = ? AND uid = ?", tablePasswords),
+		args:  []interface{}{password.ID, uid},
 	}
-	if _, err := s.db.ExecContext(ctx, q.query, q.args...); err != nil {
+	res, err := s.db.ExecContext(ctx, q.query, q.args...)
+	if err != nil {
 		return fmt.Errorf("failed delete from %q: %w", q.table.String(), err)
 	}
-	return nil
-}
-
-func (s *Storage) getPassword(ctx context.Context, uid models.UserID) ([]models.PasswordEncrypted, error) {
-	m, err := s.getMap(ctx, uid, models.RecordPassword)
+	rowsCount, err := res.RowsAffected()
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed get rows affected: %w", err)
 	}
-	q := query{
-		table: tablePasswords,
-	}
-}
-
-func (s *Storage) addMap(ctx context.Context, id models.ID, uid models.UserID, t table) error {
-	q := query{
-		table: t,
-		query: queryWithTable("INSERT INTO %s(id, uid) VALUES(?, ?)", t),
-		args:  []interface{}{id, uid},
-	}
-	_, err := s.db.ExecContext(ctx, q.query, q.args...)
-	if err != nil {
-		return fmt.Errorf("failed add map: %w", err)
+	if rowsCount == 0 {
+		return fmt.Errorf("no rows affected")
 	}
 	return nil
 }
 
-func (s *Storage) delMap(ctx context.Context, id models.ID, uid models.UserID, t table) error {
+func (s *Storage) getPasswords(ctx context.Context, uid models.UserID) ([]models.PasswordEncrypted, error) {
 	q := query{
-		table: t,
-		query: queryWithTable("DELETE FROM %s WHERE id = ? AND uid = ?", t),
-		args:  []interface{}{id, uid},
-	}
-	_, err := s.db.ExecContext(ctx, q.query, q.args...)
-	if err != nil {
-		return fmt.Errorf("failed del map: %w", err)
-	}
-	return nil
-}
-
-func (s *Storage) getMap(ctx context.Context, uid models.UserID, r models.RecordType) ([]models.ID, error) {
-	t := tables(r).recordMap
-	if t == tableUnknown {
-		return nil, fmt.Errorf("unknown record type: %v", r)
-	}
-	q := query{
-		table: t,
-		query: queryWithTable("SELECT id FROM %s WHERE uid = ?", t),
+		query: queryWithTable("SELECT id, login, password, meta FROM %s WHERE uid = ?", tablePasswords),
 		args:  []interface{}{uid},
 	}
-	ids := make([]models.ID, 0)
+	results := make([]models.PasswordEncrypted, 0)
 	rows, err := s.db.QueryContext(ctx, q.query, q.args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed query map: %w", err)
+		return results, fmt.Errorf("failed query passwords: %w", err)
+	}
+	if rows.Err() != nil {
+		return results, fmt.Errorf("failed get passwords: %w", rows.Err())
 	}
 	defer func() {
 		_ = rows.Close()
 	}()
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed get map: %w", err)
-	}
 	for rows.Next() {
-		var id models.ID
-		if err = rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("failed scan id: %w", err)
+		rec := &models.PasswordEncrypted{}
+		if err := rows.Scan(&rec.ID, &rec.Login, &rec.Password, &rec.Meta); err != nil {
+			return results, fmt.Errorf("failed scan passwords: %w", err)
 		}
-		ids = append(ids, id)
+		results = append(results, *rec)
 	}
-	return ids, nil
+	return results, nil
+}
+
+func (s *Storage) updatePassword(ctx context.Context, uid models.UserID, id models.ID,
+	newLogin, newPassword, newMeta []byte) error {
+	q := query{
+		query: queryWithTable("UPDATE %s SET login = ?, password = ?, meta = ? WHERE uid = ? AND id = ?",
+			tablePasswords),
+		args: []interface{}{newLogin, newPassword, newMeta, uid, id},
+	}
+	res, err := s.db.ExecContext(ctx, q.query, q.args...)
+	if err != nil {
+		return fmt.Errorf("failed update password for userID %d: %w", uid, err)
+	}
+	rowCount, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed get rows affected: %w", err)
+	}
+	if rowCount == 0 {
+		return fmt.Errorf("no rows affected for userID %d", uid)
+	}
+	return nil
 }
 
 func queryWithTable(q string, t table) string {

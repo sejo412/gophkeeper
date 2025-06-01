@@ -27,6 +27,7 @@ var (
 		Cn: "testUser42",
 	}
 	testPasswordEncrypted1 = models.PasswordEncrypted{
+		ID:       1,
 		Login:    []byte("preved"),
 		Password: []byte("medved"),
 		Meta:     []byte(`krevedko's site`),
@@ -479,10 +480,23 @@ func TestStorage_List(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    []*models.Record
+		want    models.RecordsEncrypted
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "record list",
+			fields: fields{
+				db: testDBSql,
+			},
+			args: args{
+				ctx:  context.Background(),
+				user: testUser1.ID,
+			},
+			want: models.RecordsEncrypted{
+				Password: []models.PasswordEncrypted{testPasswordEncrypted1},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -515,10 +529,39 @@ func TestStorage_Get(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    *models.Record
+		want    models.RecordEncrypted
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "record found",
+			fields: fields{
+				db: testDBSql,
+			},
+			args: args{
+				ctx:  context.Background(),
+				user: testUser1.ID,
+				t:    models.RecordPassword,
+				id:   models.ID(1),
+			},
+			want: models.RecordEncrypted{
+				Password: testPasswordEncrypted1,
+			},
+			wantErr: false,
+		},
+		{
+			name: "record not found",
+			fields: fields{
+				db: testDBSql,
+			},
+			args: args{
+				ctx:  context.Background(),
+				user: testUser42.ID,
+				t:    models.RecordPassword,
+				id:   models.ID(1),
+			},
+			want:    models.RecordEncrypted{},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -554,7 +597,46 @@ func TestStorage_Update(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "success",
+			fields: fields{
+				db: testDBSql,
+			},
+			args: args{
+				ctx:  context.Background(),
+				user: testUser1.ID,
+				t:    models.RecordPassword,
+				id:   models.ID(1),
+				record: models.RecordEncrypted{
+					Password: models.PasswordEncrypted{
+						Login:    testPasswordEncrypted1.Password,
+						Password: []byte("new password"),
+						Meta:     testPasswordEncrypted1.Meta,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "record not found",
+			fields: fields{
+				db: testDBSql,
+			},
+			args: args{
+				ctx:  context.Background(),
+				user: testUser42.ID,
+				t:    models.RecordPassword,
+				id:   models.ID(1),
+				record: models.RecordEncrypted{
+					Password: models.PasswordEncrypted{
+						Login:    []byte("login"),
+						Password: []byte("password"),
+						Meta:     []byte("meta data"),
+					},
+				},
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -585,7 +667,32 @@ func TestStorage_Delete(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "success",
+			fields: fields{
+				db: testDBSql,
+			},
+			args: args{
+				ctx:  context.Background(),
+				user: testUser1.ID,
+				t:    models.RecordPassword,
+				id:   models.ID(1),
+			},
+			wantErr: false,
+		},
+		{
+			name: "record not found",
+			fields: fields{
+				db: testDBSql,
+			},
+			args: args{
+				ctx:  context.Background(),
+				user: testUser42.ID,
+				t:    models.RecordPassword,
+				id:   models.ID(1),
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -64,6 +64,7 @@ type Password struct {
 }
 
 type PasswordEncrypted struct {
+	ID       ID
 	Login    Encrypted
 	Password Encrypted
 	Meta     Encrypted
@@ -76,6 +77,7 @@ type Text struct {
 }
 
 type TextEncrypted struct {
+	ID   ID
 	Text Encrypted
 	Meta Encrypted
 }
@@ -87,6 +89,7 @@ type Bin struct {
 }
 
 type BinEncrypted struct {
+	ID   ID
 	Data Encrypted
 	Meta Encrypted
 }
@@ -100,6 +103,7 @@ type Bank struct {
 }
 
 type BankEncrypted struct {
+	ID     ID
 	Number Encrypted
 	Date   Encrypted
 	Cvv    Encrypted
