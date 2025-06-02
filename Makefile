@@ -1,3 +1,26 @@
+MODULE := github.com/sejo412/gophkeeper/internal/config
+BUILD_VERSION ?= 0.0.0-rc1
+BUILD_COMMIT ?= $$(git rev-parse HEAD)
+BUILD_DATE ?= $$(date -R)
+
+.PHONY: all
+all: clean proto server client
+
+.PHONY: server
+server:
+	go build -race -ldflags \
+		"-X '$(MODULE).BuildVersion=$(BUILD_VERSION)'\
+		-X '$(MODULE).BuildCommit=$(BUILD_COMMIT)'\
+		-X '$(MODULE).BuildDate=$(BUILD_DATE)'"\
+		-o ./bin/server ./cmd/server/
+
+.PHONY: client
+client:
+	go build -race -ldflags \
+		"-X '$(MODULE).BuildVersion=$(BUILD_VERSION)'\
+		-X '$(MODULE).BuildCommit=$(BUILD_COMMIT)'\
+		-X '$(MODULE).BuildDate=$(BUILD_DATE)'"\
+		-o ./bin/client ./cmd/client/
 
 .PHONY: statictest
 statictest:
@@ -22,3 +45,7 @@ cover:
 	go tool cover -html=coverage.out -o coverage.html
 	go tool cover -func=coverage.out
 	@rm -f coverage.out
+
+.PHONY: clean
+clean:
+	rm -f ./bin/{server,client}

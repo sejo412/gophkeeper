@@ -1,0 +1,50 @@
+package server
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/sejo412/gophkeeper/internal/constants"
+	"github.com/sejo412/gophkeeper/internal/helpers"
+	"github.com/sejo412/gophkeeper/internal/storage/sqlite"
+	"github.com/sejo412/gophkeeper/pkg/certs"
+)
+
+func createDatabase(ctx context.Context, dbFile string) error {
+	if _, err := os.Create(dbFile); err != nil {
+		return fmt.Errorf("could not create database: %w", err)
+	}
+	store, err := sqlite.New(dbFile)
+	if err != nil {
+		return fmt.Errorf("could not open database: %w", err)
+	}
+	defer func() {
+		_ = store.Close()
+	}()
+	if err = store.Init(ctx); err != nil {
+		return fmt.Errorf("could not initialize database: %w", err)
+	}
+	return nil
+}
+
+func createCA(_ context.Context, cert, key string) error {
+	req := certs.CertRequest{
+		CommonName:  constants.CertCACommonName,
+		DNSNames:    nil,
+		IPAddresses: nil,
+		Emails:      nil,
+		IsCA:        true,
+	}
+	certBytes, keyBytes, err := certs.GenRsaCert(req, certs.CASigner{})
+	if err != nil {
+		return fmt.Errorf("could not generate CA certificate/key pair: %w", err)
+	}
+	if err = helpers.SaveRegularFile(key, keyBytes, 0600); err != nil {
+		return fmt.Errorf("could not save CA key: %w", err)
+	}
+	if err = helpers.SaveRegularFile(cert, certBytes, 0644); err != nil {
+		return fmt.Errorf("could not save CA certificate: %w", err)
+	}
+	return nil
+}

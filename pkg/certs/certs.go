@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/sejo412/gophkeeper/internal/helpers"
 )
 
 func NewCert(name string) *Cert {
@@ -38,17 +40,17 @@ func NewCert(name string) *Cert {
 
 func (c *Cert) Save() error {
 	if c.PrivateContent.File != "" {
-		if err := saveRegularFile(c.PrivateContent.File, c.PrivateContent.Content, 0600); err != nil {
+		if err := saveCert(c.PrivateContent.File, c.PrivateContent.Content, 0600); err != nil {
 			return fmt.Errorf("failed to save private certificate: %w", err)
 		}
 	}
 	if c.PublicContent.File != "" {
-		if err := saveRegularFile(c.PublicContent.File, c.PublicContent.Content, 0644); err != nil {
+		if err := saveCert(c.PublicContent.File, c.PublicContent.Content, 0644); err != nil {
 			return fmt.Errorf("failed to save public certificate: %w", err)
 		}
 	}
 	if c.CAContent.File != "" {
-		if err := saveRegularFile(c.CAContent.File, c.CAContent.Content, 0644); err != nil {
+		if err := saveCert(c.CAContent.File, c.CAContent.Content, 0644); err != nil {
 			return fmt.Errorf("failed to save CA certificate: %w", err)
 		}
 	}
@@ -163,8 +165,8 @@ func GenRsaKey(bits int) (*rsa.PrivateKey, error) {
 	return key, nil
 }
 
-// GenRsaCert returns generated certificate and key pair
-func GenRsaCert(request CertRequest, signer CaSigner) (certOut, keyOut []byte, err error) {
+// GenRsaCert returns generated certificate and key pair.
+func GenRsaCert(request CertRequest, signer CASigner) (certOut, keyOut []byte, err error) {
 	serial, err := genSerialNumber()
 	if err != nil {
 		return
@@ -230,14 +232,7 @@ func genSerialNumber() (serialNumber *big.Int, err error) {
 	return serialNumber, nil
 }
 
-// saveRegularFile writes file with creating parent dir.
-func saveRegularFile(path string, content []byte, perms fs.FileMode) error {
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory %q: %w", dir, err)
-	}
-	if err := os.WriteFile(path, content, perms); err != nil {
-		return fmt.Errorf("failed to write file %q: %w", path, err)
-	}
-	return nil
+// saveCert writes file with creating parent dir.
+func saveCert(path string, content []byte, perms fs.FileMode) error {
+	return helpers.SaveRegularFile(path, content, perms)
 }

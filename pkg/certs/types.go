@@ -51,7 +51,7 @@ type CertRequest struct {
 	IsCA        bool
 }
 
-type CaSigner struct {
+type CASigner struct {
 	CACert []byte
 	CAKey  *rsa.PrivateKey
 }
