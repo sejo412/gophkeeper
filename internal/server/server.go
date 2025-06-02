@@ -7,17 +7,19 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/sejo412/gophkeeper/internal/config"
 	"github.com/sejo412/gophkeeper/internal/constants"
+	"github.com/sejo412/gophkeeper/proto"
 )
 
 type Server struct {
-	config *config.ServerConfig
+	config      *Config
+	grpcPublic  proto.UnimplementedPublicServer
+	grpcPrivate proto.UnimplementedPrivateServer
 }
 
-func NewServer(opts config.ServerConfig) *Server {
+func NewServer(opts Config) *Server {
 	return &Server{
-		config: config.NewServerConfigWithOptions(opts),
+		config: NewConfigWithOptions(opts),
 	}
 }
 
@@ -43,5 +45,9 @@ func (s *Server) Init() error {
 	if err := createCA(ctx, caCert, caKey); err != nil {
 		return fmt.Errorf("could not create CA: %w", err)
 	}
+	return nil
+}
+
+func (s *Server) Start() error {
 	return nil
 }

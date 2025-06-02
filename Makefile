@@ -1,4 +1,4 @@
-MODULE := github.com/sejo412/gophkeeper/internal/config
+MODULE := github.com/sejo412/gophkeeper/pkg/version
 BUILD_VERSION ?= 0.0.0-rc1
 BUILD_COMMIT ?= $$(git rev-parse HEAD)
 BUILD_DATE ?= $$(date -R)

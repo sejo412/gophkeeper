@@ -9,8 +9,8 @@ import (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "client",
-	Short: "GophKeeper client application.",
-	Long:  "\nGophKeeper client application.",
+	Short: "GophKeeper client application",
+	Long:  "\nGophKeeper client application",
 	// Run: func(cmd *cobra.Command, args []string) { },
 }
 

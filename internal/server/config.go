@@ -1,4 +1,4 @@
-package config
+package server
 
 import (
 	"context"
@@ -23,7 +23,7 @@ type Storage interface {
 	IsUserExist(ctx context.Context, uid models.UserID) (bool, error)
 }
 
-type ServerConfig struct {
+type Config struct {
 	PublicPort  int
 	PrivatePort int
 	CacheDir    string
@@ -31,10 +31,8 @@ type ServerConfig struct {
 	Storage     Storage
 }
 
-type ClientConfig struct{}
-
-func NewServerConfig() *ServerConfig {
-	return &ServerConfig{
+func NewConfig() *Config {
+	return &Config{
 		PublicPort:  -1,
 		PrivatePort: -1,
 		CacheDir:    "",
@@ -43,8 +41,8 @@ func NewServerConfig() *ServerConfig {
 	}
 }
 
-func NewServerConfigWithOptions(opts ServerConfig) *ServerConfig {
-	c := NewServerConfig()
+func NewConfigWithOptions(opts Config) *Config {
+	c := NewConfig()
 	c.PublicPort = opts.PublicPort
 	c.PrivatePort = opts.PrivatePort
 	c.CacheDir = opts.CacheDir
@@ -53,22 +51,14 @@ func NewServerConfigWithOptions(opts ServerConfig) *ServerConfig {
 	return c
 }
 
-func (s *ServerConfig) SetStorage(store Storage) {
-	s.Storage = store
+func (c *Config) SetStorage(store Storage) {
+	c.Storage = store
 }
 
-func DefaultServerCacheDir() string {
+func DefaultCacheDir() string {
 	u, err := user.Current()
 	if err != nil {
 		return "."
 	}
 	return filepath.Join(u.HomeDir, ".cache/gophkeeper/server")
-}
-
-func DefaultClientCacheDir() string {
-	u, err := user.Current()
-	if err != nil {
-		return "."
-	}
-	return filepath.Join(u.HomeDir, ".cache/gophkeeper/client")
 }

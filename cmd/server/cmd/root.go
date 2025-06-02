@@ -3,17 +3,27 @@ package cmd
 import (
 	"os"
 
-	"github.com/sejo412/gophkeeper/internal/config"
 	"github.com/sejo412/gophkeeper/internal/constants"
+	"github.com/sejo412/gophkeeper/internal/server"
 	"github.com/spf13/cobra"
 )
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "server",
-	Short: "GophKeeper server application.",
-	Long:  "\nGophKeeper server application.",
-	// Run: func(cmd *cobra.Command, args []string) { },
+	Short: "Start GophKeeper server application",
+	Long:  "\nStart GophKeeper server application",
+	Run: func(cmd *cobra.Command, args []string) {
+		s := server.NewServer(server.Config{
+			PublicPort:  publicPort,
+			PrivatePort: privatePort,
+			CacheDir:    cacheDir,
+			DNSNames:    dnsNames,
+		})
+		if err := s.Start(); err != nil {
+			panic(err)
+		}
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -26,11 +36,11 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().IntVarP(&publicPort, "public-port", "p", constants.DefaultPublicPort,
+	rootCmd.Flags().IntVarP(&publicPort, "public-port", "p", constants.DefaultPublicPort,
 		"Public port to listen on")
-	rootCmd.PersistentFlags().IntVarP(&privatePort, "private-port", "s", constants.DefaultPrivatePort,
+	rootCmd.Flags().IntVarP(&privatePort, "private-port", "s", constants.DefaultPrivatePort,
 		"Private port to listen on (with TLS)")
-	rootCmd.PersistentFlags().StringVarP(&cacheDir, "dir", "d", config.DefaultServerCacheDir(),
+	rootCmd.Flags().StringSliceVar(&dnsNames, "dns", constants.DefaultDNSNames, "DNS names to serve")
+	rootCmd.PersistentFlags().StringVarP(&cacheDir, "dir", "d", server.DefaultCacheDir(),
 		"Cache directory to save certificates and database")
-	rootCmd.PersistentFlags().StringSliceVar(&dnsNames, "dns", constants.DefaultDNSNames, "DNS names to serve")
 }
