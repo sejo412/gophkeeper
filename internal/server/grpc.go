@@ -12,9 +12,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const internalError = "internal error"
+const ctxCNKey = "CommonName"
 
 type publicConfig struct {
 	port   int
@@ -63,42 +65,68 @@ type GRPCPrivate struct {
 	config privateConfig
 }
 
-func (p *GRPCPublic) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.RegisterResponse, error) {
-	ok := new(bool)
+func (s *GRPCPrivate) List(ctx context.Context, in *emptypb.Empty) (*pb.ListResponse,
+	error) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (s *GRPCPrivate) Create(ctx context.Context, in *pb.AddRecordRequest) (*pb.AddRecordResponse, error) {
+	_, ok := ctx.Value(ctxCNKey).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, internalError)
+	}
+	switch in.GetType() {
+	case pb.RecordType_PASSWORD:
+		return nil, status.Error(codes.Unknown, internalError)
+	default:
+		return nil, status.Error(codes.InvalidArgument, "invalid type")
+	}
+}
+
+func (s *GRPCPrivate) Read(ctx context.Context, in *pb.GetRecordRequest) (*pb.GetRecordResponse,
+	error) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (s *GRPCPrivate) Update(ctx context.Context, in *pb.UpdateRecordRequest) (*pb.UpdateRecordResponse, error) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (s *GRPCPrivate) Delete(ctx context.Context, in *pb.DeleteRecordRequest) (*pb.DeleteRecordResponse, error) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (sp *GRPCPublic) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.RegisterResponse, error) {
 	msg := new(string)
 	certRequest, err := certs.BinaryToRequest(in.GetCertRequest())
 	if err != nil {
-		*ok = false
 		*msg = err.Error()
 		slog.Error("parsing certificate request", "error", err)
 		return &pb.RegisterResponse{
-			Ok:    ok,
 			Error: msg,
 		}, status.Error(codes.InvalidArgument, err.Error())
 	}
-	if _, err = p.config.store.NewUser(ctx, certRequest.CommonName); err != nil {
-		*ok = false
+	if _, err = sp.config.store.NewUser(ctx, certRequest.CommonName); err != nil {
 		*msg = err.Error()
 		slog.Error("creating new user", "error", err)
 		return &pb.RegisterResponse{
-			Ok:    ok,
 			Error: msg,
 		}, status.Error(codes.InvalidArgument, err.Error())
 	}
-	cert, _, err := certs.GenRsaCert(certRequest, p.config.signer)
+	cert, _, err := certs.GenRsaCert(certRequest, sp.config.signer)
 	if err != nil {
-		*ok = false
 		*msg = err.Error()
 		slog.Error("generating certificate", "error", err)
 		return &pb.RegisterResponse{
-			Ok:    ok,
 			Error: msg,
 		}, status.Error(codes.Internal, internalError)
 	}
-	*ok = true
 	return &pb.RegisterResponse{
-		Ok:                ok,
-		CaCertificate:     p.config.signer.CACert,
+		CaCertificate:     sp.config.signer.CACert,
 		ClientCertificate: cert,
 	}, nil
 }
@@ -118,7 +146,7 @@ func NewGRPCPublic(config Config) (*GRPCPublic, error) {
 	}, nil
 }
 
-func grpcPublicServerOptions(server *GRPCPublic) []grpc.ServerOption {
+func grpcPublicServerOptions(_ *GRPCPublic) []grpc.ServerOption {
 	opts := make([]grpc.ServerOption, 0)
 	return opts
 }
@@ -140,7 +168,7 @@ func NewGRPCPrivate(config Config) *GRPCPrivate {
 	}
 }
 
-func grpcPrivateServerOptions(server *GRPCPrivate) []grpc.ServerOption {
+func grpcPrivateServerOptions(_ *GRPCPrivate) []grpc.ServerOption {
 	opts := make([]grpc.ServerOption, 0)
 	return opts
 }

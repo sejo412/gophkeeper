@@ -20,9 +20,10 @@ type Storage interface {
 	) error
 	Delete(ctx context.Context, uid models.UserID, t models.RecordType, id models.ID) error
 	IsExist(ctx context.Context, user models.UserID, t models.RecordType, id models.ID) (bool, error)
-	Users(ctx context.Context) ([]*models.User, error)
-	NewUser(ctx context.Context, cn string) (*models.UserID, error)
+	Users(ctx context.Context) ([]models.User, error)
+	NewUser(ctx context.Context, cn string) (models.UserID, error)
 	IsUserExist(ctx context.Context, uid models.UserID) (bool, error)
+	GetUserID(ctx context.Context, cn string) (models.UserID, error)
 }
 
 type Config struct {

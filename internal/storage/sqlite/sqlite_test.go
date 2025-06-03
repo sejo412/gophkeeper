@@ -141,7 +141,7 @@ func TestStorage_NewUser(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    *models.UserID
+		want    models.UserID
 		wantErr bool
 	}{
 		{
@@ -153,7 +153,7 @@ func TestStorage_NewUser(t *testing.T) {
 				ctx: context.Background(),
 				cn:  testUser1.Cn,
 			},
-			want:    &testUser1.ID,
+			want:    testUser1.ID,
 			wantErr: false,
 		},
 		{
@@ -165,7 +165,7 @@ func TestStorage_NewUser(t *testing.T) {
 				ctx: context.Background(),
 				cn:  testUser1.Cn,
 			},
-			want:    nil,
+			want:    -1,
 			wantErr: true,
 		},
 	}
@@ -232,7 +232,7 @@ func TestStorage_userIDbyCn(t *testing.T) {
 			s := &Storage{
 				db: tt.fields.db,
 			}
-			got, err := s.userIDbyCn(tt.args.ctx, tt.args.cn)
+			got, err := s.GetUserID(tt.args.ctx, tt.args.cn)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("userIDbyCn() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -255,7 +255,7 @@ func TestStorage_Users(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    []*models.User
+		want    []models.User
 		wantErr bool
 	}{
 		{
@@ -266,8 +266,8 @@ func TestStorage_Users(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 			},
-			want: []*models.User{
-				&testUser1,
+			want: []models.User{
+				testUser1,
 			},
 			wantErr: false,
 		},

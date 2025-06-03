@@ -6,11 +6,12 @@ option go_package = "gophkeeper/proto";
 
 import "google/protobuf/empty.proto";
 
-enum CertType {
+enum RecordType {
   UNKNOWN = 0;
-  CA = 1;
-  SERVER = 2;
-  CLIENT = 3;
+  PASSWORD = 1;
+  TEXT = 2;
+  BIN = 3;
+  BANK = 4;
 }
 
 message RegisterRequest {
@@ -18,7 +19,7 @@ message RegisterRequest {
 }
 
 message RegisterResponse {
-  bool ok = 1;
+  reserved 1;
   bytes ca_certificate = 2;
   bytes client_certificate = 3;
   string error = 4;
@@ -32,10 +33,53 @@ message ListResponse {
   string error = 5;
 }
 
+message AddRecordRequest {
+  RecordType type = 1;
+  bytes record = 2;
+}
+
+message AddRecordResponse {
+  string error = 1;
+}
+
+message GetRecordRequest {
+  RecordType type = 1;
+  int64 record_number = 2;
+}
+
+message GetRecordResponse {
+  RecordType type = 1;
+  bytes record = 2;
+  string error = 3;
+}
+
+message UpdateRecordRequest {
+  RecordType type = 1;
+  int64 record_number = 2;
+  bytes record = 3;
+}
+
+message UpdateRecordResponse {
+  string error = 1;
+}
+
+message DeleteRecordRequest {
+  RecordType type = 1;
+  int64 record_number = 2;
+}
+
+message DeleteRecordResponse {
+  string error = 1;
+}
+
 service Public {
   rpc Register(RegisterRequest) returns (RegisterResponse);
 }
 
 service Private {
   rpc List(google.protobuf.Empty) returns (ListResponse);
+  rpc Create(AddRecordRequest) returns (AddRecordResponse);
+  rpc Read(GetRecordRequest) returns (GetRecordResponse);
+  rpc Update(UpdateRecordRequest) returns (UpdateRecordResponse);
+  rpc Delete(DeleteRecordRequest) returns (DeleteRecordResponse);
 }

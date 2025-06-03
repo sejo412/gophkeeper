@@ -168,11 +168,11 @@ func (s *Storage) isOwner(ctx context.Context, uid models.UserID, t models.Recor
 	return realUID == int(uid), nil
 }
 
-func (s *Storage) Users(ctx context.Context) ([]*models.User, error) {
+func (s *Storage) Users(ctx context.Context) ([]models.User, error) {
 	q := query{
 		query: queryWithTable("SELECT id, cn FROM %s ORDER BY id", tableUsers),
 	}
-	users := make([]*models.User, 0)
+	users := make([]models.User, 0)
 	rows, err := s.db.QueryContext(ctx, q.query)
 	if err != nil {
 		return users, fmt.Errorf("failed query users: %w", err)
@@ -189,7 +189,7 @@ func (s *Storage) Users(ctx context.Context) ([]*models.User, error) {
 		if err = rows.Scan(&id, &cn); err != nil {
 			return nil, fmt.Errorf("failed scan users: %w", err)
 		}
-		users = append(users, &models.User{
+		users = append(users, models.User{
 			ID: models.UserID(id),
 			Cn: cn,
 		})
@@ -198,17 +198,17 @@ func (s *Storage) Users(ctx context.Context) ([]*models.User, error) {
 	return users, nil
 }
 
-func (s *Storage) NewUser(ctx context.Context, cn string) (*models.UserID, error) {
+func (s *Storage) NewUser(ctx context.Context, cn string) (models.UserID, error) {
 	q := query{
 		query: queryWithTable("INSERT INTO %s(cn) VALUES (?) RETURNING id", tableUsers),
 		args:  []interface{}{cn},
 	}
 	var uid int
 	if err := s.db.QueryRowContext(ctx, q.query, q.args...).Scan(&uid); err != nil {
-		return nil, fmt.Errorf("could not create user: %w", err)
+		return -1, fmt.Errorf("could not create user: %w", err)
 	}
 	result := models.UserID(uid)
-	return &result, nil
+	return result, nil
 }
 
 func (s *Storage) IsUserExist(ctx context.Context, user models.UserID) (bool, error) {
@@ -223,7 +223,7 @@ func (s *Storage) IsUserExist(ctx context.Context, user models.UserID) (bool, er
 	return count > 0, nil
 }
 
-func (s *Storage) userIDbyCn(ctx context.Context, cn string) (models.UserID, error) {
+func (s *Storage) GetUserID(ctx context.Context, cn string) (models.UserID, error) {
 	q := query{
 		query: queryWithTable("SELECT id FROM %s WHERE cn = ?", tableUsers),
 		args:  []interface{}{cn},
