@@ -12,12 +12,14 @@ const (
 )
 
 const (
-	DBFilename            string = "database.db"
-	CertCAPublicFilename  string = "ca.crt"
-	CertCAPrivateFilename string = "ca.key"
-	CertBits              int    = 2048
-	CertCACommonName      string = "GophKeeper Root CA"
-	CertCAName            string = "CA"
+	DBFilename                string = "database.db"
+	CertCAPublicFilename      string = "ca.crt"
+	CertCAPrivateFilename     string = "ca.key"
+	CertCACommonName          string = "GophKeeper Root CA"
+	CertCAName                string = "CA"
+	CertClientPublicFilename  string = "client.crt"
+	CertClientPrivateFilename string = "client.key"
+	KeyBits                   int    = 2048
 )
 
 var (

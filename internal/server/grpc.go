@@ -24,7 +24,7 @@ type publicConfig struct {
 }
 
 func newPublicConfig(port int, caCertFile, caKeyFile string, store *Storage) (publicConfig, error) {
-	signer, err := certs.GetSigner(caCertFile, caKeyFile)
+	signer, err := certs.GetCASigner(caCertFile, caKeyFile)
 	if err != nil {
 		return publicConfig{}, fmt.Errorf("error loading CA signer: %w", err)
 	}

@@ -6,10 +6,11 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/json"
-	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/fs"
 	"math/big"
+	"net"
 	"os"
 	"path/filepath"
 	"sync"
@@ -79,6 +80,37 @@ func (c *Cert) Get() *Cert {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	return c
+}
+
+func NewCertRequest(cn string, dnsNames, emails []string, ip []net.IP, isCA bool) *CertRequest {
+	return &CertRequest{
+		CommonName:  cn,
+		DNSNames:    dnsNames,
+		Emails:      emails,
+		IPAddresses: ip,
+		IsCA:        isCA,
+	}
+}
+
+func (csr *CertRequest) Sign(key []byte) error {
+	var err error
+	csrTemplate := x509.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: csr.CommonName,
+		},
+		DNSNames:       csr.DNSNames,
+		EmailAddresses: csr.Emails,
+		IPAddresses:    csr.IPAddresses,
+	}
+	parsed, err := x509.ParsePKCS8PrivateKey(key)
+	if err != nil {
+		return fmt.Errorf("failed to parse private key: %w", err)
+	}
+	csr.Signed, err = x509.CreateCertificateRequest(rand.Reader, &csrTemplate, parsed)
+	if err != nil {
+		return fmt.Errorf("failed to sign certificate request: %w", err)
+	}
+	return nil
 }
 
 func LoadCert(name string, certType CertType, private, public, ca string) (*Cert, error) {
@@ -188,8 +220,8 @@ func GenRsaCert(request CertRequest, signer CASigner) (certOut, keyOut []byte, e
 	}
 
 	var signerCert *x509.Certificate
-	var signerKey *rsa.PrivateKey
-
+	var signerKey any
+	var publicKey any
 	if request.IsCA {
 		key, err := GenRsaKey(keyBits)
 		if err != nil {
@@ -201,17 +233,25 @@ func GenRsaCert(request CertRequest, signer CASigner) (certOut, keyOut []byte, e
 		}
 		signerCert = template
 		signerKey = key
+		publicKey = &key.PublicKey
 	} else {
-		block, _ := pem.Decode(signer.CACert)
-		blockBytes := block.Bytes
-		signerCert, err = x509.ParseCertificate(blockBytes)
+		signerCert, err = x509.ParseCertificate(signer.CACert)
 		if err != nil {
 			return nil, nil, err
 		}
+		if request.Signed == nil {
+			return nil, nil, errors.New("could not find signed csr")
+		}
+		csr, err := x509.ParseCertificateRequest(request.Signed)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to parse signed csr: %w", err)
+		}
+		publicKey = csr.PublicKey
+
 		signerKey = signer.CAKey
 	}
 
-	certOut, err = x509.CreateCertificate(rand.Reader, template, signerCert, &signerKey.PublicKey, signerKey)
+	certOut, err = x509.CreateCertificate(rand.Reader, template, signerCert, publicKey, signerKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -219,7 +259,7 @@ func GenRsaCert(request CertRequest, signer CASigner) (certOut, keyOut []byte, e
 	return certOut, keyOut, nil
 }
 
-func GetSigner(certFile, certKey string) (CASigner, error) {
+func GetCASigner(certFile, certKey string) (CASigner, error) {
 	res := CASigner{}
 	keyBytes, err := os.ReadFile(certKey)
 	if err != nil {

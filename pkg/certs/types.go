@@ -43,11 +43,12 @@ type Content struct {
 }
 
 type CertRequest struct {
+	IsCA        bool
 	CommonName  string
 	DNSNames    []string
-	IPAddresses []net.IP
 	Emails      []string
-	IsCA        bool
+	IPAddresses []net.IP
+	Signed      []byte
 }
 
 type CASigner struct {
