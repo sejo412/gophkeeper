@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io/fs"
@@ -19,9 +20,8 @@ import (
 
 func NewCert(name string) *Cert {
 	return &Cert{
-		Name:  name,
-		Owner: "root",
-		Type:  Unknown,
+		Name: name,
+		Type: Unknown,
 		PrivateContent: Content{
 			File:    "",
 			Content: []byte{},
@@ -57,19 +57,18 @@ func (c *Cert) Save() error {
 	return nil
 }
 
-func (c *Cert) Setup(certType CertType, owner string, private, public Content) {
+func (c *Cert) Setup(certType CertType, private, public Content) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.Type = certType
-	c.Owner = owner
 	c.PrivateContent.File = private.File
 	c.PrivateContent.Content = private.Content
 	c.PublicContent.File = public.File
 	c.PublicContent.Content = public.Content
 }
 
-func (c *Cert) SetupWithCA(certType CertType, owner string, private, public, ca Content) {
-	c.Setup(certType, owner, private, public)
+func (c *Cert) SetupWithCA(certType CertType, private, public, ca Content) {
+	c.Setup(certType, private, public)
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.CAContent.File = ca.File
@@ -82,10 +81,14 @@ func (c *Cert) Get() *Cert {
 	return c
 }
 
-func LoadCert(name string, certType CertType, owner, private, public, ca string) (*Cert, error) {
-	privateContent, err := os.ReadFile(private)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read private certificate: %w", err)
+func LoadCert(name string, certType CertType, private, public, ca string) (*Cert, error) {
+	var privateContent []byte
+	if private != "" {
+		var err error
+		privateContent, err = os.ReadFile(private)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read private certificate: %w", err)
+		}
 	}
 	publicContent, err := os.ReadFile(public)
 	if err != nil {
@@ -98,17 +101,13 @@ func LoadCert(name string, certType CertType, owner, private, public, ca string)
 			return nil, fmt.Errorf("failed to read CA certificate: %w", err)
 		}
 		cert.SetupWithCA(
-			certType,
-			owner,
-			Content{
+			certType, Content{
 				File:    private,
 				Content: privateContent,
-			},
-			Content{
+			}, Content{
 				File:    public,
 				Content: publicContent,
-			},
-			Content{
+			}, Content{
 				File:    ca,
 				Content: caContent,
 			},
@@ -116,13 +115,10 @@ func LoadCert(name string, certType CertType, owner, private, public, ca string)
 		return cert, nil
 	}
 	cert.Setup(
-		certType,
-		owner,
-		Content{
+		certType, Content{
 			File:    private,
 			Content: privateContent,
-		},
-		Content{
+		}, Content{
 			File:    public,
 			Content: publicContent,
 		},
@@ -139,17 +135,17 @@ func CertByName(c []*Cert, name string) *Cert {
 	return nil
 }
 
-func CopyCertFrom(c []*Cert, oldName, newName, newDir, newOwner string) *Cert {
+func CopyCertFrom(c []*Cert, oldName, newName, newDir string) *Cert {
 	toClone := CertByName(c, oldName)
 	if toClone == nil {
 		return nil
 	}
 	newCert := NewCert(newName)
 	if toClone.Type == Client {
-		newCert.SetupWithCA(toClone.Type, newOwner, toClone.PrivateContent, toClone.PublicContent, toClone.CAContent)
+		newCert.SetupWithCA(toClone.Type, toClone.PrivateContent, toClone.PublicContent, toClone.CAContent)
 		newCert.CAContent.File = filepath.Join(newDir, filepath.Base(toClone.CAContent.File))
 	} else {
-		newCert.Setup(toClone.Type, newOwner, toClone.PrivateContent, toClone.PublicContent)
+		newCert.Setup(toClone.Type, toClone.PrivateContent, toClone.PublicContent)
 	}
 	newCert.PrivateContent.File = filepath.Join(newDir, filepath.Base(toClone.PrivateContent.File))
 	newCert.PublicContent.File = filepath.Join(newDir, filepath.Base(toClone.PublicContent.File))
@@ -223,6 +219,24 @@ func GenRsaCert(request CertRequest, signer CASigner) (certOut, keyOut []byte, e
 	return certOut, keyOut, nil
 }
 
+func GetSigner(certFile, certKey string) (CASigner, error) {
+	res := CASigner{}
+	keyBytes, err := os.ReadFile(certKey)
+	if err != nil {
+		return res, fmt.Errorf("failed to read key file: %w", err)
+	}
+	key, err := x509.ParsePKCS8PrivateKey(keyBytes)
+	if err != nil {
+		return res, fmt.Errorf("failed to parse key file: %w", err)
+	}
+	res.CAKey = key.(*rsa.PrivateKey)
+	res.CACert, err = os.ReadFile(certFile)
+	if err != nil {
+		return res, fmt.Errorf("failed to read certificate file: %w", err)
+	}
+	return res, nil
+}
+
 func genSerialNumber() (serialNumber *big.Int, err error) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err = rand.Int(rand.Reader, serialNumberLimit)
@@ -235,4 +249,20 @@ func genSerialNumber() (serialNumber *big.Int, err error) {
 // saveCert writes file with creating parent dir.
 func saveCert(path string, content []byte, perms fs.FileMode) error {
 	return helpers.SaveRegularFile(path, content, perms)
+}
+
+func RequestToBinary(req CertRequest) ([]byte, error) {
+	res, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed convert request to binary: %w", err)
+	}
+	return res, nil
+}
+
+func BinaryToRequest(req []byte) (CertRequest, error) {
+	var request CertRequest
+	if err := json.Unmarshal(req, &request); err != nil {
+		return CertRequest{}, fmt.Errorf("failed convert request to binary: %w", err)
+	}
+	return request, nil
 }

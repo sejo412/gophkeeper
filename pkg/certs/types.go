@@ -30,7 +30,6 @@ const (
 
 type Cert struct {
 	Name           string
-	Owner          string
 	PrivateContent Content
 	PublicContent  Content
 	CAContent      Content
