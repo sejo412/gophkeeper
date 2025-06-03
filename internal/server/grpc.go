@@ -23,6 +23,14 @@ type publicConfig struct {
 	store  Storage
 }
 
+type privateConfig struct {
+	port   int
+	caCert string
+	cert   string
+	key    string
+	store  Storage
+}
+
 func newPublicConfig(port int, caCertFile, caKeyFile string, store *Storage) (publicConfig, error) {
 	signer, err := certs.GetCASigner(caCertFile, caKeyFile)
 	if err != nil {
@@ -35,9 +43,24 @@ func newPublicConfig(port int, caCertFile, caKeyFile string, store *Storage) (pu
 	}, nil
 }
 
+func newPrivateConfig(port int, caCertFile, certFile, keyFile string, store *Storage) privateConfig {
+	return privateConfig{
+		port:   port,
+		caCert: caCertFile,
+		cert:   certFile,
+		key:    keyFile,
+		store:  *store,
+	}
+}
+
 type GRPCPublic struct {
 	pb.UnimplementedPublicServer
 	config publicConfig
+}
+
+type GRPCPrivate struct {
+	pb.UnimplementedPrivateServer
+	config privateConfig
 }
 
 func (p *GRPCPublic) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.RegisterResponse, error) {
@@ -102,4 +125,26 @@ func grpcPublicServerOptions(server *GRPCPublic) []grpc.ServerOption {
 
 func registerGRPCPublicServer(grpc *grpc.Server, server *GRPCPublic) {
 	pb.RegisterPublicServer(grpc, server)
+}
+
+func NewGRPCPrivate(config Config) *GRPCPrivate {
+	cfg := newPrivateConfig(
+		config.PrivatePort,
+		filepath.Join(config.CacheDir, constants.CertCAPublicFilename),
+		filepath.Join(config.CacheDir, constants.CertServerPublicFilename),
+		filepath.Join(config.CacheDir, constants.CertServerPrivateFilename),
+		&config.Storage,
+	)
+	return &GRPCPrivate{
+		config: cfg,
+	}
+}
+
+func grpcPrivateServerOptions(server *GRPCPrivate) []grpc.ServerOption {
+	opts := make([]grpc.ServerOption, 0)
+	return opts
+}
+
+func registerGRPCPrivateServer(grpc *grpc.Server, server *GRPCPrivate) {
+	pb.RegisterPrivateServer(grpc, server)
 }

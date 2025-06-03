@@ -19,6 +19,9 @@ const (
 	CertCAName                string = "CA"
 	CertClientPublicFilename  string = "client.crt"
 	CertClientPrivateFilename string = "client.key"
+	CertServerPublicFilename  string = "server.crt"
+	CertServerPrivateFilename string = "server.key"
+	CertServerCommonName      string = "GophKeeper Server"
 	KeyBits                   int    = 2048
 )
 

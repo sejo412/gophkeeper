@@ -193,7 +193,7 @@ func GenRsaKey(bits int) (*rsa.PrivateKey, error) {
 	return key, nil
 }
 
-// GenRsaCert returns generated certificate and key pair.
+// GenRsaCert returns generated certificate and key pair (key returns only for CA).
 func GenRsaCert(request CertRequest, signer CASigner) (certOut, keyOut []byte, err error) {
 	serial, err := genSerialNumber()
 	if err != nil {

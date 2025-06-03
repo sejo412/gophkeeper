@@ -14,12 +14,13 @@ var rootCmd = &cobra.Command{
 	Short: "Start GophKeeper server application",
 	Long:  "\nStart GophKeeper server application",
 	Run: func(cmd *cobra.Command, args []string) {
-		s := server.NewServer(server.Config{
-			PublicPort:  publicPort,
-			PrivatePort: privatePort,
-			CacheDir:    cacheDir,
-			DNSNames:    dnsNames,
-		})
+		s := server.NewServer(
+			server.Config{
+				PublicPort:  publicPort,
+				PrivatePort: privatePort,
+				CacheDir:    cacheDir,
+			},
+		)
 		if err := s.Start(); err != nil {
 			panic(err)
 		}
@@ -36,11 +37,16 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.Flags().IntVarP(&publicPort, "public-port", "p", constants.DefaultPublicPort,
-		"Public port to listen on")
-	rootCmd.Flags().IntVarP(&privatePort, "private-port", "s", constants.DefaultPrivatePort,
-		"Private port to listen on (with TLS)")
-	rootCmd.Flags().StringSliceVar(&dnsNames, "dns", constants.DefaultDNSNames, "DNS names to serve")
-	rootCmd.PersistentFlags().StringVarP(&cacheDir, "dir", "d", server.DefaultCacheDir(),
-		"Cache directory to save certificates and database")
+	rootCmd.Flags().IntVarP(
+		&publicPort, "public-port", "p", constants.DefaultPublicPort,
+		"Public port to listen on",
+	)
+	rootCmd.Flags().IntVarP(
+		&privatePort, "private-port", "s", constants.DefaultPrivatePort,
+		"Private port to listen on (with TLS)",
+	)
+	rootCmd.PersistentFlags().StringVarP(
+		&cacheDir, "dir", "d", server.DefaultCacheDir(),
+		"Cache directory to save certificates and database",
+	)
 }

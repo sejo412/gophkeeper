@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"crypto/x509"
 	"fmt"
+	"net"
 	"os"
 
 	"github.com/sejo412/gophkeeper/internal/constants"
@@ -45,6 +47,42 @@ func createCA(_ context.Context, cert, key string) error {
 	}
 	if err = helpers.SaveRegularFile(cert, certBytes, 0644); err != nil {
 		return fmt.Errorf("could not save CA certificate: %w", err)
+	}
+	return nil
+}
+
+func createServerCert(_ context.Context, dns []string, ip []net.IP, cert, key, caCert, caKey string) error {
+	req := certs.NewCertRequest(
+		constants.CertServerCommonName,
+		dns,
+		nil,
+		ip,
+		false,
+	)
+	rsaKey, err := certs.GenRsaKey(constants.KeyBits)
+	if err != nil {
+		return fmt.Errorf("could not generate server key: %w", err)
+	}
+	rsaBytes, err := x509.MarshalPKCS8PrivateKey(rsaKey)
+	if err != nil {
+		return fmt.Errorf("could not marshal server key: %w", err)
+	}
+	if err = req.Sign(rsaBytes); err != nil {
+		return fmt.Errorf("could not sign server certificate request: %w", err)
+	}
+	signer, err := certs.GetCASigner(caCert, caKey)
+	if err != nil {
+		return fmt.Errorf("could not get CA signer: %w", err)
+	}
+	certBytes, _, err := certs.GenRsaCert(*req, signer)
+	if err != nil {
+		return fmt.Errorf("could not generate server certificate: %w", err)
+	}
+	if err = helpers.SaveRegularFile(key, rsaBytes, 0600); err != nil {
+		return fmt.Errorf("could not save server key: %w", err)
+	}
+	if err = helpers.SaveRegularFile(cert, certBytes, 0644); err != nil {
+		return fmt.Errorf("could not save server certificate: %w", err)
 	}
 	return nil
 }

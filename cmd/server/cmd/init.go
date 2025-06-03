@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/sejo412/gophkeeper/internal/constants"
 	"github.com/sejo412/gophkeeper/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -17,9 +18,12 @@ var initCmd = &cobra.Command{
 All data and certificates will be overwritten!
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		s := server.NewServer(server.Config{
-			CacheDir: cacheDir,
-		})
+		s := server.NewServer(
+			server.Config{
+				CacheDir: cacheDir,
+				DNSNames: dnsNames,
+			},
+		)
 		if err := s.Init(); err != nil {
 			panic(err)
 		}
@@ -28,4 +32,5 @@ All data and certificates will be overwritten!
 
 func init() {
 	rootCmd.AddCommand(initCmd)
+	initCmd.Flags().StringSliceVar(&dnsNames, "dns", constants.DefaultDNSNames, "DNS names to serve")
 }

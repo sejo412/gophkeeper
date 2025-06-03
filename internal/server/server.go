@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/sejo412/gophkeeper/internal/constants"
+	"github.com/sejo412/gophkeeper/internal/helpers"
 	"github.com/sejo412/gophkeeper/internal/storage/sqlite"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
@@ -49,6 +50,13 @@ func (s *Server) Init() error {
 	caKey := filepath.Join(s.config.CacheDir, constants.CertCAPrivateFilename)
 	if err := createCA(ctx, caCert, caKey); err != nil {
 		return fmt.Errorf("could not create CA: %w", err)
+	}
+	if err := createServerCert(
+		ctx, s.config.DNSNames, helpers.MyIPAddresses(),
+		filepath.Join(s.config.CacheDir, constants.CertServerPublicFilename),
+		filepath.Join(s.config.CacheDir, constants.CertServerPrivateFilename), caCert, caKey,
+	); err != nil {
+		return fmt.Errorf("could not create server cert: %w", err)
 	}
 	return nil
 }
