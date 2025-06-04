@@ -12,7 +12,10 @@ const (
 )
 
 const (
-	DBFilename                string = "database.db"
+	DBFilename string = "database.db"
+)
+
+const (
 	CertCAPublicFilename      string = "ca.crt"
 	CertCAPrivateFilename     string = "ca.key"
 	CertCACommonName          string = "GophKeeper Root CA"
@@ -23,6 +26,8 @@ const (
 	CertServerPrivateFilename string = "server.key"
 	CertServerCommonName      string = "GophKeeper Server"
 	KeyBits                   int    = 2048
+	PemCertType               string = "CERTIFICATE"
+	PemKeyType                string = "RSA PRIVATE KEY"
 )
 
 var (

@@ -39,7 +39,6 @@ func init() {
 	registerCmd.Flags().StringVarP(
 		&publicHost, "server", "s", defaultPublicServer, "public server address",
 	)
-	registerCmd.Flags().StringVarP(&cacheDir, "dir", "d", client.DefaultCacheDir(), "cache directory")
 	registerCmd.Flags().StringVarP(&userName, "user", "u", "", "user name")
 	_ = registerCmd.MarkFlagRequired("user")
 }

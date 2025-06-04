@@ -11,12 +11,17 @@ import (
 	pb "github.com/sejo412/gophkeeper/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 )
 
 const internalError = "internal error"
 const ctxCNKey = "CommonName"
+const ctxUIDKey = "UserID"
 
 type publicConfig struct {
 	port   int
@@ -26,11 +31,33 @@ type publicConfig struct {
 }
 
 type privateConfig struct {
-	port   int
-	caCert string
-	cert   string
-	key    string
-	store  Storage
+	port  int
+	store Storage
+}
+
+func NewGRPCPublic(config Config) (*GRPCPublic, error) {
+	cfg, err := newPublicConfig(
+		config.PublicPort,
+		filepath.Join(config.CacheDir, constants.CertCAPublicFilename),
+		filepath.Join(config.CacheDir, constants.CertCAPrivateFilename),
+		&config.Storage,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error create public config: %w", err)
+	}
+	return &GRPCPublic{
+		config: cfg,
+	}, nil
+}
+
+func NewGRPCPrivate(config Config) *GRPCPrivate {
+	cfg := newPrivateConfig(
+		config.PrivatePort,
+		&config.Storage,
+	)
+	return &GRPCPrivate{
+		config: cfg,
+	}
 }
 
 func newPublicConfig(port int, caCertFile, caKeyFile string, store *Storage) (publicConfig, error) {
@@ -45,13 +72,10 @@ func newPublicConfig(port int, caCertFile, caKeyFile string, store *Storage) (pu
 	}, nil
 }
 
-func newPrivateConfig(port int, caCertFile, certFile, keyFile string, store *Storage) privateConfig {
+func newPrivateConfig(port int, store *Storage) privateConfig {
 	return privateConfig{
-		port:   port,
-		caCert: caCertFile,
-		cert:   certFile,
-		key:    keyFile,
-		store:  *store,
+		port:  port,
+		store: *store,
 	}
 }
 
@@ -65,27 +89,32 @@ type GRPCPrivate struct {
 	config privateConfig
 }
 
-func (s *GRPCPrivate) List(ctx context.Context, in *emptypb.Empty) (*pb.ListResponse,
-	error) {
+func (s *GRPCPrivate) List(ctx context.Context, in *emptypb.Empty) (
+	*pb.ListResponse,
+	error,
+) {
 	// TODO implement me
 	panic("implement me")
 }
 
 func (s *GRPCPrivate) Create(ctx context.Context, in *pb.AddRecordRequest) (*pb.AddRecordResponse, error) {
-	_, ok := ctx.Value(ctxCNKey).(string)
+	_, ok := ctx.Value(ctxUIDKey).(int)
 	if !ok {
-		return nil, status.Error(codes.Internal, internalError)
+		slog.Info("unauthorized request")
+		return nil, status.Error(codes.Internal, "unauthorized")
 	}
 	switch in.GetType() {
 	case pb.RecordType_PASSWORD:
-		return nil, status.Error(codes.Unknown, internalError)
+		return &pb.AddRecordResponse{Error: stringToPtr("preved")}, nil
 	default:
 		return nil, status.Error(codes.InvalidArgument, "invalid type")
 	}
 }
 
-func (s *GRPCPrivate) Read(ctx context.Context, in *pb.GetRecordRequest) (*pb.GetRecordResponse,
-	error) {
+func (s *GRPCPrivate) Read(ctx context.Context, in *pb.GetRecordRequest) (
+	*pb.GetRecordResponse,
+	error,
+) {
 	// TODO implement me
 	panic("implement me")
 }
@@ -131,23 +160,64 @@ func (sp *GRPCPublic) Register(ctx context.Context, in *pb.RegisterRequest) (*pb
 	}, nil
 }
 
-func NewGRPCPublic(config Config) (*GRPCPublic, error) {
-	cfg, err := newPublicConfig(
-		config.PublicPort,
-		filepath.Join(config.CacheDir, constants.CertCAPublicFilename),
-		filepath.Join(config.CacheDir, constants.CertCAPrivateFilename),
-		&config.Storage,
+func loggerInterceptor() logging.Logger {
+	return logging.LoggerFunc(
+		func(ctx context.Context, lvl logging.Level, msg string, keyvals ...any) {
+			uid := ctx.Value(ctxUIDKey).(int)
+			cn := ctx.Value(ctxCNKey).(string)
+			keyvals = append(keyvals, slog.String("User", cn), slog.Int("UserID", uid))
+			slog.Log(ctx, slog.Level(lvl), msg, keyvals...)
+		},
 	)
-	if err != nil {
-		return nil, fmt.Errorf("error create public config: %w", err)
+}
+
+func (s *GRPCPrivate) authInterceptor(
+	ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+) (interface{}, error) {
+	message := func(msg string, args ...any) string {
+		return "[auth] " + fmt.Sprintf(msg, args...)
 	}
-	return &GRPCPublic{
-		config: cfg,
-	}, nil
+	p, ok := peer.FromContext(ctx)
+	if !ok {
+		msg := message("client information not found")
+		slog.Info(msg)
+		return nil, status.Error(codes.Unauthenticated, msg)
+	}
+	tlsInfo, ok := p.AuthInfo.(credentials.TLSInfo)
+	if !ok {
+		msg := message("client credentials not found")
+		slog.Info(msg)
+		return nil, status.Error(codes.Unauthenticated, message(msg))
+	}
+	if len(tlsInfo.State.VerifiedChains) == 0 || len(tlsInfo.State.VerifiedChains[0]) == 0 {
+		msg := message("client verified certificate not found")
+		slog.Info(msg)
+		return nil, status.Error(codes.Unauthenticated, msg)
+	}
+
+	cert := tlsInfo.State.VerifiedChains[0][0]
+	commonName := cert.Subject.CommonName
+	if commonName == "" {
+		msg := message("client common name not found")
+		slog.Info(msg)
+		return nil, status.Error(codes.Unauthenticated, msg)
+	}
+	uid, err := s.config.store.GetUserID(ctx, commonName)
+	if err != nil {
+		msg := message("user id for %q not found", commonName)
+		slog.Info(msg)
+		return nil, status.Error(codes.Unauthenticated, msg)
+	}
+	ctx = context.WithValue(ctx, ctxUIDKey, int(uid))
+	ctx = context.WithValue(ctx, ctxCNKey, commonName)
+	return handler(ctx, req)
 }
 
 func grpcPublicServerOptions(_ *GRPCPublic) []grpc.ServerOption {
 	opts := make([]grpc.ServerOption, 0)
+	unaryInterceptors := make([]grpc.UnaryServerInterceptor, 0)
+	unaryInterceptors = append(unaryInterceptors, logging.UnaryServerInterceptor(loggerInterceptor()))
+	opts = append(opts, grpc.ChainUnaryInterceptor(unaryInterceptors...))
 	return opts
 }
 
@@ -155,24 +225,20 @@ func registerGRPCPublicServer(grpc *grpc.Server, server *GRPCPublic) {
 	pb.RegisterPublicServer(grpc, server)
 }
 
-func NewGRPCPrivate(config Config) *GRPCPrivate {
-	cfg := newPrivateConfig(
-		config.PrivatePort,
-		filepath.Join(config.CacheDir, constants.CertCAPublicFilename),
-		filepath.Join(config.CacheDir, constants.CertServerPublicFilename),
-		filepath.Join(config.CacheDir, constants.CertServerPrivateFilename),
-		&config.Storage,
-	)
-	return &GRPCPrivate{
-		config: cfg,
-	}
-}
-
-func grpcPrivateServerOptions(_ *GRPCPrivate) []grpc.ServerOption {
+func grpcPrivateServerOptions(server *GRPCPrivate, creds credentials.TransportCredentials) []grpc.ServerOption {
 	opts := make([]grpc.ServerOption, 0)
+	unaryInterceptors := make([]grpc.UnaryServerInterceptor, 0)
+	unaryInterceptors = append(unaryInterceptors, server.authInterceptor)
+	unaryInterceptors = append(unaryInterceptors, logging.UnaryServerInterceptor(loggerInterceptor()))
+	opts = append(opts, grpc.Creds(creds))
+	opts = append(opts, grpc.ChainUnaryInterceptor(unaryInterceptors...))
 	return opts
 }
 
 func registerGRPCPrivateServer(grpc *grpc.Server, server *GRPCPrivate) {
 	pb.RegisterPrivateServer(grpc, server)
+}
+
+func stringToPtr(s string) *string {
+	return &s
 }

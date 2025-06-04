@@ -2,6 +2,9 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,12 +18,14 @@ import (
 	"github.com/sejo412/gophkeeper/internal/storage/sqlite"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 )
 
 type Server struct {
-	config     *Config
-	grpcPublic *GRPCPublic
+	config      *Config
+	grpcPublic  *GRPCPublic
+	grpcPrivate *GRPCPrivate
 }
 
 func NewServer(opts Config) *Server {
@@ -78,15 +83,27 @@ func (s *Server) Start() error {
 		return fmt.Errorf("could not create public server: %w", err)
 	}
 	publicGRPCServer := grpc.NewServer(grpcPublicServerOptions(s.grpcPublic)...)
-	slog.Info("starting public server")
 	registerGRPCPublicServer(publicGRPCServer, s.grpcPublic)
-
 	// for debug
 	reflection.Register(publicGRPCServer)
+
+	tlsCfg, err := tlsConfig(s.config.CacheDir)
+	if err != nil {
+		return fmt.Errorf("could not create TLS configuration: %w", err)
+	}
+	creds := credentials.NewTLS(tlsCfg)
+
+	s.grpcPrivate = NewGRPCPrivate(*s.config)
+	privateGRPCServer := grpc.NewServer(grpcPrivateServerOptions(s.grpcPrivate, creds)...)
+	registerGRPCPrivateServer(privateGRPCServer, s.grpcPrivate)
 
 	publicListener, err := net.Listen("tcp", fmt.Sprintf(":%d", s.config.PublicPort))
 	if err != nil {
 		return fmt.Errorf("could not listen on port %d: %w", s.config.PublicPort, err)
+	}
+	privateListener, err := net.Listen("tcp", fmt.Sprintf(":%d", s.config.PrivatePort))
+	if err != nil {
+		return fmt.Errorf("could not listen on port %d: %w", s.config.PrivatePort, err)
 	}
 
 	idleConnsClosed := make(chan struct{})
@@ -94,15 +111,25 @@ func (s *Server) Start() error {
 	signal.Notify(sigs, constants.GracefulSignals...)
 	go func() {
 		<-sigs
-		slog.Info("shutting down server...")
+		fmt.Println()
+		slog.Info("shutting down public server...")
 		publicGRPCServer.GracefulStop()
+		slog.Info("shutting down private server...")
+		privateGRPCServer.GracefulStop()
 		close(idleConnsClosed)
 	}()
 
 	var errGrp errgroup.Group
 	errGrp.Go(
 		func() error {
+			slog.Info("starting public server")
 			return publicGRPCServer.Serve(publicListener)
+		},
+	)
+	errGrp.Go(
+		func() error {
+			slog.Info("starting private server")
+			return privateGRPCServer.Serve(privateListener)
 		},
 	)
 
@@ -112,4 +139,46 @@ func (s *Server) Start() error {
 	<-idleConnsClosed
 	slog.Info("server stopped")
 	return nil
+}
+
+func tlsConfig(dir string) (*tls.Config, error) {
+	derCert, err := os.ReadFile(filepath.Join(dir, constants.CertServerPublicFilename))
+	if err != nil {
+		return nil, fmt.Errorf("could not read server certificate: %w", err)
+	}
+	derKey, err := os.ReadFile(filepath.Join(dir, constants.CertServerPrivateFilename))
+	if err != nil {
+		return nil, fmt.Errorf("could not read private key: %w", err)
+	}
+	keyPair, err := tls.X509KeyPair(
+		pem.EncodeToMemory(
+			&pem.Block{
+				Type:  constants.PemCertType,
+				Bytes: derCert,
+			},
+		), pem.EncodeToMemory(
+			&pem.Block{
+				Type:  constants.PemKeyType,
+				Bytes: derKey,
+			},
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not load server key pair: %w", err)
+	}
+	derCaCert, err := os.ReadFile(filepath.Join(dir, constants.CertCAPublicFilename))
+	if err != nil {
+		return nil, fmt.Errorf("could not load CA certificate: %w", err)
+	}
+	caCert, err := x509.ParseCertificate(derCaCert)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse CA certificate: %w", err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AddCert(caCert)
+	return &tls.Config{
+		Certificates: []tls.Certificate{keyPair},
+		ClientCAs:    caCertPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+	}, nil
 }

@@ -2,7 +2,9 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +14,7 @@ import (
 	"github.com/sejo412/gophkeeper/pkg/certs"
 	pb "github.com/sejo412/gophkeeper/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -79,4 +82,73 @@ func (c *Client) Register(name string) error {
 		return fmt.Errorf("failed to save client certificate: %w", err)
 	}
 	return nil
+}
+
+func (c *Client) Run() error {
+	tlsCfg, err := tlsConfig(c.config.CacheDir)
+	if err != nil {
+		return fmt.Errorf("failed to create tls config: %w", err)
+	}
+	grpcClient, err := grpc.NewClient(c.config.PrivateAddress, grpc.WithTransportCredentials(credentials.NewTLS(tlsCfg)))
+	if err != nil {
+		return fmt.Errorf("failed to create private client: %w", err)
+	}
+	defer func() {
+		_ = grpcClient.Close()
+	}()
+	privateClient := pb.NewPrivateClient(grpcClient)
+	ctx := context.Background()
+	resp, err := privateClient.Create(
+		ctx, &pb.AddRecordRequest{
+			Type:   protoRecordType(pb.RecordType_PASSWORD),
+			Record: []byte("preved"),
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed request: %w", err)
+	}
+	fmt.Println(resp)
+	return nil
+}
+
+func tlsConfig(dir string) (*tls.Config, error) {
+	derCert, err := os.ReadFile(filepath.Join(dir, constants.CertClientPublicFilename))
+	if err != nil {
+		return nil, fmt.Errorf("could not read client certificate: %w", err)
+	}
+	derKey, err := os.ReadFile(filepath.Join(dir, constants.CertClientPrivateFilename))
+	if err != nil {
+		return nil, fmt.Errorf("could not read private key: %w", err)
+	}
+	keyPair, err := tls.X509KeyPair(
+		pem.EncodeToMemory(
+			&pem.Block{
+				Type:  constants.PemCertType,
+				Bytes: derCert,
+			},
+		), pem.EncodeToMemory(
+			&pem.Block{
+				Type:  constants.PemKeyType,
+				Bytes: derKey,
+			},
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not load client key pair: %w", err)
+	}
+	derCaCert, err := os.ReadFile(filepath.Join(dir, constants.CertCAPublicFilename))
+	if err != nil {
+		return nil, fmt.Errorf("could not load CA certificate: %w", err)
+	}
+	caCert, err := x509.ParseCertificate(derCaCert)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse CA certificate: %w", err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AddCert(caCert)
+	return &tls.Config{
+		Certificates: []tls.Certificate{keyPair},
+		RootCAs:      caCertPool,
+		MinVersion:   tls.VersionTLS12,
+	}, nil
 }
