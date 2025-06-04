@@ -2,13 +2,14 @@ package client
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/sejo412/gophkeeper/internal/models"
 )
 
-func mainMenu() {
+func mainMenu(ctx context.Context, c *Client) {
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
 		clearScreen()
@@ -25,13 +26,13 @@ func mainMenu() {
 		case MainList.Key():
 			listAllRecords()
 		case MainPasswords.Key():
-			subMenu(MainPasswords)
+			subMenu(ctx, c, MainPasswords)
 		case MainBanks.Key():
-			subMenu(MainBanks)
+			subMenu(ctx, c, MainBanks)
 		case MainTexts.Key():
-			subMenu(MainTexts)
+			subMenu(ctx, c, MainTexts)
 		case MainBins.Key():
-			subMenu(MainBins)
+			subMenu(ctx, c, MainBins)
 		case MainExit.Key():
 			fmt.Println("\nExiting...")
 			os.Exit(0)
@@ -42,7 +43,7 @@ func mainMenu() {
 	}
 }
 
-func subMenu(parent MainMenu) {
+func subMenu(ctx context.Context, c *Client, parent MainMenu) {
 	scanner := bufio.NewScanner(os.Stdin)
 
 	for {
@@ -58,15 +59,15 @@ func subMenu(parent MainMenu) {
 
 		switch input {
 		case SubList.Key():
-			stubFunction(parent.Record(), SubList.Action())
+			actionFunction(ctx, c, parent.Record(), SubList.Action())
 		case SubCreate.Key():
-			stubFunction(parent.Record(), SubCreate.Action())
+			actionFunction(ctx, c, parent.Record(), SubCreate.Action())
 		case SubRead.Key():
-			stubFunction(parent.Record(), SubRead.Action())
+			actionFunction(ctx, c, parent.Record(), SubRead.Action())
 		case SubUpdate.Key():
-			stubFunction(parent.Record(), SubUpdate.Action())
+			actionFunction(ctx, c, parent.Record(), SubUpdate.Action())
 		case SubDelete.Key():
-			stubFunction(parent.Record(), SubDelete.Action())
+			actionFunction(ctx, c, parent.Record(), SubDelete.Action())
 		case SubBack.Key():
 			return
 		case SubExit.Key():
@@ -77,7 +78,6 @@ func subMenu(parent MainMenu) {
 
 		}
 	}
-
 }
 
 func listAllRecords() {
@@ -86,10 +86,23 @@ func listAllRecords() {
 	waitForEnter()
 }
 
-func stubFunction(object models.RecordType, action Action) {
+func actionFunction(ctx context.Context, c *Client, object models.RecordType, action Action) {
 	clearScreen()
 	fmt.Printf("%s: %s\n", object.String(), action.String())
-	fmt.Println("(not implemented)")
+	scanner := bufio.NewScanner(os.Stdin)
+	switch object {
+	case models.RecordPassword:
+		switch action {
+		case ActionCreate:
+			createPassword(ctx, c, scanner)
+		case ActionRead:
+			getPassword(ctx, c, scanner)
+		default:
+			fmt.Printf("(action %q not supported for %q)\n", action.String(), object.String())
+		}
+	default:
+		fmt.Println("(not implemented)")
+	}
 	waitForEnter()
 }
 
@@ -99,5 +112,5 @@ func clearScreen() {
 
 func waitForEnter() {
 	fmt.Print("\nPress Enter to continue...")
-	bufio.NewReader(os.Stdin).ReadBytes('\n')
+	_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
 }

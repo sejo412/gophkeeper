@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -21,7 +22,10 @@ import (
 )
 
 type Client struct {
-	config *Config
+	config     *Config
+	client     pb.PrivateClient
+	publicKey  *rsa.PublicKey
+	privateKey *rsa.PrivateKey
 }
 
 func NewClient(config Config) *Client {
@@ -91,6 +95,9 @@ func (c *Client) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to create tls config: %w", err)
 	}
+	if err = c.SetRSAKeys(); err != nil {
+		return fmt.Errorf("failed to set RSA keys: %w", err)
+	}
 	grpcClient, err := grpc.NewClient(c.config.PrivateAddress, grpc.WithTransportCredentials(credentials.NewTLS(tlsCfg)))
 	if err != nil {
 		return fmt.Errorf("failed to create private client: %w", err)
@@ -98,7 +105,7 @@ func (c *Client) Run() error {
 	defer func() {
 		_ = grpcClient.Close()
 	}()
-	_ = pb.NewPrivateClient(grpcClient)
+	c.client = pb.NewPrivateClient(grpcClient)
 	ctx, cancel := context.WithCancel(context.Background())
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
@@ -112,20 +119,21 @@ func (c *Client) Run() error {
 			return
 		}
 	}()
-	mainMenu()
-	/*
-		resp, err := privateClient.Create(
-			ctx, &pb.AddRecordRequest{
-				Type:   protoRecordType(pb.RecordType_PASSWORD),
-				Record: []byte("preved"),
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("failed request: %w", err)
-		}
-		fmt.Println(resp)
+	mainMenu(ctx, c)
+	return nil
+}
 
-	*/
+func (c *Client) SetRSAKeys() error {
+	derKey, err := os.ReadFile(filepath.Join(c.config.CacheDir, constants.CertClientPrivateFilename))
+	if err != nil {
+		return fmt.Errorf("could not read private key: %w", err)
+	}
+	key, err := x509.ParsePKCS8PrivateKey(derKey)
+	if err != nil {
+		return fmt.Errorf("could not parse private key: %w", err)
+	}
+	c.privateKey = key.(*rsa.PrivateKey)
+	c.publicKey = &c.privateKey.PublicKey
 	return nil
 }
 

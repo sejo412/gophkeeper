@@ -134,7 +134,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PrivateClient interface {
 	List(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListResponse, error)
-	Create(ctx context.Context, in *AddRecordRequest, opts ...grpc.CallOption) (*AddRecordResponse, error)
+	Create(ctx context.Context, in *AddRecordRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Read(ctx context.Context, in *GetRecordRequest, opts ...grpc.CallOption) (*GetRecordResponse, error)
 	Update(ctx context.Context, in *UpdateRecordRequest, opts ...grpc.CallOption) (*UpdateRecordResponse, error)
 	Delete(ctx context.Context, in *DeleteRecordRequest, opts ...grpc.CallOption) (*DeleteRecordResponse, error)
@@ -158,9 +158,9 @@ func (c *privateClient) List(ctx context.Context, in *emptypb.Empty, opts ...grp
 	return out, nil
 }
 
-func (c *privateClient) Create(ctx context.Context, in *AddRecordRequest, opts ...grpc.CallOption) (*AddRecordResponse, error) {
+func (c *privateClient) Create(ctx context.Context, in *AddRecordRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AddRecordResponse)
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, Private_Create_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -203,7 +203,7 @@ func (c *privateClient) Delete(ctx context.Context, in *DeleteRecordRequest, opt
 // for forward compatibility.
 type PrivateServer interface {
 	List(context.Context, *emptypb.Empty) (*ListResponse, error)
-	Create(context.Context, *AddRecordRequest) (*AddRecordResponse, error)
+	Create(context.Context, *AddRecordRequest) (*emptypb.Empty, error)
 	Read(context.Context, *GetRecordRequest) (*GetRecordResponse, error)
 	Update(context.Context, *UpdateRecordRequest) (*UpdateRecordResponse, error)
 	Delete(context.Context, *DeleteRecordRequest) (*DeleteRecordResponse, error)
@@ -220,7 +220,7 @@ type UnimplementedPrivateServer struct{}
 func (UnimplementedPrivateServer) List(context.Context, *emptypb.Empty) (*ListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
 }
-func (UnimplementedPrivateServer) Create(context.Context, *AddRecordRequest) (*AddRecordResponse, error) {
+func (UnimplementedPrivateServer) Create(context.Context, *AddRecordRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
 }
 func (UnimplementedPrivateServer) Read(context.Context, *GetRecordRequest) (*GetRecordResponse, error) {

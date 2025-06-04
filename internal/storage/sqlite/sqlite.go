@@ -29,28 +29,38 @@ func (s *Storage) Init(ctx context.Context) error {
 	queries := []query{
 		{
 			table: tableUsers,
-			query: queryWithTable("CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, cn TEXT UNIQUE NOT NULL)",
-				tableUsers),
+			query: queryWithTable(
+				"CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, cn TEXT UNIQUE NOT NULL)",
+				tableUsers,
+			),
 		},
 		{
 			table: tablePasswords,
-			query: queryWithTable("CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, uid INTEGER NOT NULL, login BLOB, password BLOB, meta BLOB)",
-				tablePasswords),
+			query: queryWithTable(
+				"CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, uid INTEGER NOT NULL, login BLOB, password BLOB, meta BLOB)",
+				tablePasswords,
+			),
 		},
 		{
 			table: tableTexts,
-			query: queryWithTable("CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, uid INTEGER NOT NULL, text BLOB, meta BLOB)",
-				tableTexts),
+			query: queryWithTable(
+				"CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, uid INTEGER NOT NULL, text BLOB, meta BLOB)",
+				tableTexts,
+			),
 		},
 		{
 			table: tableBins,
-			query: queryWithTable("CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, uid INTEGER NOT NULL, data BLOB, meta BLOB)",
-				tableBins),
+			query: queryWithTable(
+				"CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, uid INTEGER NOT NULL, data BLOB, meta BLOB)",
+				tableBins,
+			),
 		},
 		{
 			table: tableBanks,
-			query: queryWithTable("CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, uid, INTEGER NOT NULL, number BLOB, date BLOB, cvv BLOB, meta BLOB)",
-				tableBanks),
+			query: queryWithTable(
+				"CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, uid, INTEGER NOT NULL, number BLOB, date BLOB, cvv BLOB, meta BLOB)",
+				tableBanks,
+			),
 		},
 	}
 	for _, q := range queries {
@@ -75,17 +85,24 @@ func (s *Storage) List(ctx context.Context, uid models.UserID) (models.RecordsEn
 	return recs, nil
 }
 
-func (s *Storage) Get(ctx context.Context, user models.UserID, t models.RecordType,
-	id models.ID) (models.RecordEncrypted, error) {
+func (s *Storage) Get(
+	ctx context.Context, user models.UserID, t models.RecordType,
+	id models.ID,
+) (models.RecordEncrypted, error) {
 	var rec models.RecordEncrypted
 	switch t {
 	case models.RecordPassword:
 		passwords, err := s.getPasswords(ctx, user)
-		if err != nil || len(passwords) != 1 {
+		if err != nil {
 			return rec, err
 		}
-		rec.Password = passwords[0]
-		return rec, nil
+		for _, password := range passwords {
+			if password.ID == id {
+				rec.Password = password
+				return rec, nil
+			}
+		}
+		return rec, fmt.Errorf("record not found")
 	default:
 		return rec, errors.New("invalid record type")
 	}
@@ -100,8 +117,10 @@ func (s *Storage) Delete(ctx context.Context, uid models.UserID, t models.Record
 	}
 }
 
-func (s *Storage) Update(ctx context.Context, uid models.UserID, t models.RecordType, id models.ID,
-	record models.RecordEncrypted) error {
+func (s *Storage) Update(
+	ctx context.Context, uid models.UserID, t models.RecordType, id models.ID,
+	record models.RecordEncrypted,
+) error {
 	switch t {
 	case models.RecordPassword:
 		return s.updatePassword(ctx, uid, id, record.Password.Login, record.Password.Password, record.Password.Meta)
@@ -110,8 +129,10 @@ func (s *Storage) Update(ctx context.Context, uid models.UserID, t models.Record
 	}
 }
 
-func (s *Storage) Add(ctx context.Context, uid models.UserID, t models.RecordType,
-	record models.RecordEncrypted) error {
+func (s *Storage) Add(
+	ctx context.Context, uid models.UserID, t models.RecordType,
+	record models.RecordEncrypted,
+) error {
 	if ok, err := s.IsUserExist(ctx, uid); err != nil || !ok {
 		return fmt.Errorf("user id %q not exist or error: %w", uid, err)
 	}
@@ -189,10 +210,12 @@ func (s *Storage) Users(ctx context.Context) ([]models.User, error) {
 		if err = rows.Scan(&id, &cn); err != nil {
 			return nil, fmt.Errorf("failed scan users: %w", err)
 		}
-		users = append(users, models.User{
-			ID: models.UserID(id),
-			Cn: cn,
-		})
+		users = append(
+			users, models.User{
+				ID: models.UserID(id),
+				Cn: cn,
+			},
+		)
 	}
 
 	return users, nil
@@ -296,11 +319,15 @@ func (s *Storage) getPasswords(ctx context.Context, uid models.UserID) ([]models
 	return results, nil
 }
 
-func (s *Storage) updatePassword(ctx context.Context, uid models.UserID, id models.ID,
-	newLogin, newPassword, newMeta []byte) error {
+func (s *Storage) updatePassword(
+	ctx context.Context, uid models.UserID, id models.ID,
+	newLogin, newPassword, newMeta []byte,
+) error {
 	q := query{
-		query: queryWithTable("UPDATE %s SET login = ?, password = ?, meta = ? WHERE uid = ? AND id = ?",
-			tablePasswords),
+		query: queryWithTable(
+			"UPDATE %s SET login = ?, password = ?, meta = ? WHERE uid = ? AND id = ?",
+			tablePasswords,
+		),
 		args: []interface{}{newLogin, newPassword, newMeta, uid, id},
 	}
 	res, err := s.db.ExecContext(ctx, q.query, q.args...)

@@ -175,3 +175,9 @@ func (a Action) String() string {
 func protoRecordType(value pb.RecordType) *pb.RecordType {
 	return &value
 }
+
+func protoID(value int) *int64 {
+	res := new(int64)
+	*res = int64(value)
+	return res
+}

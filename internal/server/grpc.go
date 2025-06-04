@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"path/filepath"
 
 	"github.com/sejo412/gophkeeper/internal/constants"
+	"github.com/sejo412/gophkeeper/internal/models"
 	"github.com/sejo412/gophkeeper/pkg/certs"
 	pb "github.com/sejo412/gophkeeper/proto"
 	"google.golang.org/grpc"
@@ -97,26 +99,51 @@ func (s *GRPCPrivate) List(ctx context.Context, in *emptypb.Empty) (
 	panic("implement me")
 }
 
-func (s *GRPCPrivate) Create(ctx context.Context, in *pb.AddRecordRequest) (*pb.AddRecordResponse, error) {
-	_, ok := ctx.Value(ctxUIDKey).(int)
-	if !ok {
-		slog.Info("unauthorized request")
-		return nil, status.Error(codes.Internal, "unauthorized")
-	}
+func (s *GRPCPrivate) Create(ctx context.Context, in *pb.AddRecordRequest) (*emptypb.Empty, error) {
+	ctxUID, _ := ctx.Value(ctxUIDKey).(int)
+	uid := models.UserID(ctxUID)
 	switch in.GetType() {
 	case pb.RecordType_PASSWORD:
-		return &pb.AddRecordResponse{Error: stringToPtr("preved")}, nil
+		var record models.PasswordEncrypted
+		if err := json.Unmarshal(in.GetRecord(), &record); err != nil {
+			slog.Error("error unmarshalling password encrypted record")
+			return nil, status.Error(codes.Internal, "error unmarshalling password encrypted record")
+		}
+		if err := s.config.store.Add(
+			ctx, uid, models.RecordPassword, models.RecordEncrypted{Password: record},
+		); err != nil {
+			slog.Error("error adding record", "error", err)
+			return nil, status.Error(codes.Internal, "error adding record")
+		}
 	default:
 		return nil, status.Error(codes.InvalidArgument, "invalid type")
 	}
+	return &emptypb.Empty{}, nil
 }
 
-func (s *GRPCPrivate) Read(ctx context.Context, in *pb.GetRecordRequest) (
-	*pb.GetRecordResponse,
-	error,
-) {
-	// TODO implement me
-	panic("implement me")
+func (s *GRPCPrivate) Read(ctx context.Context, in *pb.GetRecordRequest) (*pb.GetRecordResponse, error) {
+	ctxUID, _ := ctx.Value(ctxUIDKey).(int)
+	uid := models.UserID(ctxUID)
+	switch in.GetType() {
+	case pb.RecordType_PASSWORD:
+		r, err := s.config.store.Get(ctx, uid, models.RecordPassword, models.ID(in.GetRecordNumber()))
+		if err != nil {
+			slog.Error("error getting record", "error", err)
+			return nil, status.Error(codes.Internal, "error getting record")
+		}
+		data, err := json.Marshal(r)
+		if err != nil {
+			slog.Error("error marshalling record", "error", err)
+			return nil, status.Error(codes.Internal, "error marshalling record")
+		}
+		return &pb.GetRecordResponse{
+			Type:   protoRecordType(pb.RecordType_PASSWORD),
+			Record: data,
+			Error:  nil,
+		}, nil
+	default:
+		return nil, status.Error(codes.InvalidArgument, "invalid type")
+	}
 }
 
 func (s *GRPCPrivate) Update(ctx context.Context, in *pb.UpdateRecordRequest) (*pb.UpdateRecordResponse, error) {
@@ -241,4 +268,8 @@ func registerGRPCPrivateServer(grpc *grpc.Server, server *GRPCPrivate) {
 
 func stringToPtr(s string) *string {
 	return &s
+}
+
+func protoRecordType(r pb.RecordType) *pb.RecordType {
+	return &r
 }
