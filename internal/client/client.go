@@ -7,7 +7,9 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/sejo412/gophkeeper/internal/constants"
 	"github.com/sejo412/gophkeeper/internal/helpers"
@@ -96,18 +98,34 @@ func (c *Client) Run() error {
 	defer func() {
 		_ = grpcClient.Close()
 	}()
-	privateClient := pb.NewPrivateClient(grpcClient)
-	ctx := context.Background()
-	resp, err := privateClient.Create(
-		ctx, &pb.AddRecordRequest{
-			Type:   protoRecordType(pb.RecordType_PASSWORD),
-			Record: []byte("preved"),
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("failed request: %w", err)
-	}
-	fmt.Println(resp)
+	_ = pb.NewPrivateClient(grpcClient)
+	ctx, cancel := context.WithCancel(context.Background())
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		select {
+		case <-sig:
+			fmt.Println("\nShutting down...")
+			cancel()
+			os.Exit(0)
+		case <-ctx.Done():
+			return
+		}
+	}()
+	mainMenu()
+	/*
+		resp, err := privateClient.Create(
+			ctx, &pb.AddRecordRequest{
+				Type:   protoRecordType(pb.RecordType_PASSWORD),
+				Record: []byte("preved"),
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed request: %w", err)
+		}
+		fmt.Println(resp)
+
+	*/
 	return nil
 }
 
