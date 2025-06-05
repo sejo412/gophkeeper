@@ -122,18 +122,20 @@ var Public_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	Private_List_FullMethodName   = "/gophkeeper.Private/List"
-	Private_Create_FullMethodName = "/gophkeeper.Private/Create"
-	Private_Read_FullMethodName   = "/gophkeeper.Private/Read"
-	Private_Update_FullMethodName = "/gophkeeper.Private/Update"
-	Private_Delete_FullMethodName = "/gophkeeper.Private/Delete"
+	Private_ListAll_FullMethodName = "/gophkeeper.Private/ListAll"
+	Private_List_FullMethodName    = "/gophkeeper.Private/List"
+	Private_Create_FullMethodName  = "/gophkeeper.Private/Create"
+	Private_Read_FullMethodName    = "/gophkeeper.Private/Read"
+	Private_Update_FullMethodName  = "/gophkeeper.Private/Update"
+	Private_Delete_FullMethodName  = "/gophkeeper.Private/Delete"
 )
 
 // PrivateClient is the client API for Private service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PrivateClient interface {
-	List(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListResponse, error)
+	ListAll(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListResponse, error)
+	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
 	Create(ctx context.Context, in *AddRecordRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Read(ctx context.Context, in *GetRecordRequest, opts ...grpc.CallOption) (*GetRecordResponse, error)
 	Update(ctx context.Context, in *UpdateRecordRequest, opts ...grpc.CallOption) (*UpdateRecordResponse, error)
@@ -148,7 +150,17 @@ func NewPrivateClient(cc grpc.ClientConnInterface) PrivateClient {
 	return &privateClient{cc}
 }
 
-func (c *privateClient) List(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListResponse, error) {
+func (c *privateClient) ListAll(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListResponse)
+	err := c.cc.Invoke(ctx, Private_ListAll_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *privateClient) List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListResponse)
 	err := c.cc.Invoke(ctx, Private_List_FullMethodName, in, out, cOpts...)
@@ -202,7 +214,8 @@ func (c *privateClient) Delete(ctx context.Context, in *DeleteRecordRequest, opt
 // All implementations must embed UnimplementedPrivateServer
 // for forward compatibility.
 type PrivateServer interface {
-	List(context.Context, *emptypb.Empty) (*ListResponse, error)
+	ListAll(context.Context, *emptypb.Empty) (*ListResponse, error)
+	List(context.Context, *ListRequest) (*ListResponse, error)
 	Create(context.Context, *AddRecordRequest) (*emptypb.Empty, error)
 	Read(context.Context, *GetRecordRequest) (*GetRecordResponse, error)
 	Update(context.Context, *UpdateRecordRequest) (*UpdateRecordResponse, error)
@@ -217,7 +230,10 @@ type PrivateServer interface {
 // pointer dereference when methods are called.
 type UnimplementedPrivateServer struct{}
 
-func (UnimplementedPrivateServer) List(context.Context, *emptypb.Empty) (*ListResponse, error) {
+func (UnimplementedPrivateServer) ListAll(context.Context, *emptypb.Empty) (*ListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListAll not implemented")
+}
+func (UnimplementedPrivateServer) List(context.Context, *ListRequest) (*ListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
 }
 func (UnimplementedPrivateServer) Create(context.Context, *AddRecordRequest) (*emptypb.Empty, error) {
@@ -253,8 +269,26 @@ func RegisterPrivateServer(s grpc.ServiceRegistrar, srv PrivateServer) {
 	s.RegisterService(&Private_ServiceDesc, srv)
 }
 
-func _Private_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Private_ListAll_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PrivateServer).ListAll(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Private_ListAll_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PrivateServer).ListAll(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Private_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -266,7 +300,7 @@ func _Private_List_Handler(srv interface{}, ctx context.Context, dec func(interf
 		FullMethod: Private_List_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PrivateServer).List(ctx, req.(*emptypb.Empty))
+		return srv.(PrivateServer).List(ctx, req.(*ListRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -350,6 +384,10 @@ var Private_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "gophkeeper.Private",
 	HandlerType: (*PrivateServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListAll",
+			Handler:    _Private_ListAll_Handler,
+		},
 		{
 			MethodName: "List",
 			Handler:    _Private_List_Handler,

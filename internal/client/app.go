@@ -3,7 +3,6 @@ package client
 import (
 	"bufio"
 	"context"
-	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -13,114 +12,202 @@ import (
 	pb "github.com/sejo412/gophkeeper/proto"
 )
 
-func createPassword(ctx context.Context, c *Client, scanner *bufio.Scanner) {
-	record := models.Password{}
-	fmt.Print("Login: ")
-	scanner.Scan()
-	record.Login = scanner.Text()
-	fmt.Print("Password: ")
-	scanner.Scan()
-	record.Password = scanner.Text()
-	fmt.Print("Meta: ")
-	scanner.Scan()
-	record.Meta = models.Meta(scanner.Text())
-
-	encoded, err := encryptPassword(c.publicKey, record)
+func createRecord(ctx context.Context, c *Client, t models.RecordType, scanner *bufio.Scanner) {
+	encrypted := models.RecordEncrypted{
+		Password: models.PasswordEncrypted{},
+		Text:     models.TextEncrypted{},
+		Bin:      models.BinEncrypted{},
+		Bank:     models.BankEncrypted{},
+	}
+	f := fields(t)
+	for _, field := range f {
+		fmt.Printf("%s: ", field.String())
+		scanner.Scan()
+		val := scanner.Text()
+		valEnc, err := crypt.EncryptWithPublicKey(c.publicKey, []byte(val))
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		switch t {
+		case models.RecordPassword:
+			switch field {
+			case FieldLogin:
+				encrypted.Password.Login = valEnc
+			case FieldPassword:
+				encrypted.Password.Password = valEnc
+			case FieldMeta:
+				encrypted.Password.Meta = valEnc
+			default:
+			}
+		case models.RecordText:
+			switch field {
+			case FieldText:
+				encrypted.Text.Text = valEnc
+			case FieldMeta:
+				encrypted.Text.Meta = valEnc
+			default:
+			}
+		case models.RecordBin:
+			switch field {
+			case FieldData:
+				encrypted.Bin.Data = valEnc
+			case FieldMeta:
+				encrypted.Bin.Meta = valEnc
+			default:
+			}
+		case models.RecordBank:
+			switch field {
+			case FieldNumber:
+				encrypted.Bank.Number = valEnc
+			case FieldDate:
+				encrypted.Bank.Date = valEnc
+			case FieldCVV:
+				encrypted.Bank.Cvv = valEnc
+			case FieldMeta:
+				encrypted.Bank.Meta = valEnc
+			default:
+			}
+		default:
+		}
+	}
+	bin, err := json.Marshal(&encrypted)
 	if err != nil {
-		fmt.Println("Error encode password record: ", err)
+		fmt.Println(err)
 		return
 	}
-
-	bin, err := json.Marshal(encoded)
-	if err != nil {
-		fmt.Println("Error marshalling record: ", err)
-		return
-	}
-
-	resp, err := c.client.Create(
+	_, err = c.client.Create(
 		ctx, &pb.AddRecordRequest{
-			Type:   protoRecordType(pb.RecordType_PASSWORD),
+			Type:   protoRecordType(modelRecordTypeToProto(t)),
 			Record: bin,
 		},
 	)
 	if err != nil {
-		fmt.Printf("Error creating record: %v\n", err)
-	} else {
-		fmt.Printf("Created record: %v\n", resp)
+		fmt.Printf("failed to send request: %v\n", err)
 	}
 }
 
-func getPassword(ctx context.Context, c *Client, scanner *bufio.Scanner) {
-	fmt.Print("Choose password: ")
+func readRecord(ctx context.Context, c *Client, t models.RecordType, scanner *bufio.Scanner) {
+	fmt.Printf("Choose %s: ", t.String())
 	scanner.Scan()
-	num := scanner.Text()
-	id, err := strconv.Atoi(num)
+	val := scanner.Text()
+	id, err := strconv.Atoi(val)
 	if err != nil {
-		fmt.Println("Invalid number: ", err)
+		fmt.Println("Invalid ID: ", err)
 		return
 	}
 	resp, err := c.client.Read(
-		ctx, &pb.GetRecordRequest{
-			Type:         protoRecordType(pb.RecordType_PASSWORD),
+		ctx,
+		&pb.GetRecordRequest{
+			Type:         protoRecordType(modelRecordTypeToProto(t)),
 			RecordNumber: protoID(id),
 		},
 	)
 	if err != nil {
-		fmt.Printf("Error getting password: %v\n", err)
+		fmt.Printf("Error getting %s: %v\n", t.String(), err)
 		return
 	}
-	record := resp.GetRecord()
-	password := models.RecordEncrypted{}
-	err = json.Unmarshal(record, &password)
+	protoRecord := resp.GetRecord()
+	record := models.RecordEncrypted{}
+	err = json.Unmarshal(protoRecord, &record)
 	if err != nil {
 		fmt.Printf("Error unmarshalling record: %v\n", err)
 		return
 	}
-	res, err := decryptPassword(c.privateKey, password.Password)
+	for _, field := range fields(t) {
+		var valDec []byte
+		var err error
+		switch t {
+		case models.RecordPassword:
+			switch field {
+			case FieldLogin:
+				valDec, err = crypt.DecryptWithPrivateKey(c.privateKey, record.Password.Login)
+			case FieldPassword:
+				valDec, err = crypt.DecryptWithPrivateKey(c.privateKey, record.Password.Password)
+			case FieldMeta:
+				valDec, err = crypt.DecryptWithPrivateKey(c.privateKey, record.Password.Meta)
+			default:
+			}
+		case models.RecordText:
+			switch field {
+			case FieldText:
+				valDec, err = crypt.DecryptWithPrivateKey(c.privateKey, record.Text.Text)
+			case FieldMeta:
+				valDec, err = crypt.DecryptWithPrivateKey(c.privateKey, record.Text.Meta)
+			default:
+			}
+		case models.RecordBin:
+			switch field {
+			case FieldData:
+				valDec, err = crypt.DecryptWithPrivateKey(c.privateKey, record.Bin.Data)
+			case FieldMeta:
+				valDec, err = crypt.DecryptWithPrivateKey(c.privateKey, record.Bin.Meta)
+			default:
+			}
+		case models.RecordBank:
+			switch field {
+			case FieldNumber:
+				valDec, err = crypt.DecryptWithPrivateKey(c.privateKey, record.Bank.Number)
+			case FieldDate:
+				valDec, err = crypt.DecryptWithPrivateKey(c.privateKey, record.Bank.Date)
+			case FieldCVV:
+				valDec, err = crypt.DecryptWithPrivateKey(c.privateKey, record.Bank.Cvv)
+			case FieldMeta:
+				valDec, err = crypt.DecryptWithPrivateKey(c.privateKey, record.Bank.Meta)
+			default:
+			}
+		default:
+		}
+		if err != nil {
+			fmt.Printf("Error decrypt %s: %v\n", field.String(), err)
+			return
+		}
+		fmt.Printf("%s: %s\n", field.String(), string(valDec))
+	}
+}
+
+func listRecords(ctx context.Context, c *Client, t models.RecordType) {
+	resp, err := c.client.List(
+		ctx, &pb.ListRequest{
+			Type: protoRecordType(modelRecordTypeToProto(t)),
+		},
+	)
 	if err != nil {
-		fmt.Println("Error decrypting password: ", err)
+		fmt.Printf("Error listing records: %v\n", err)
 		return
 	}
-	fmt.Println("Login: ", res.Login)
-	fmt.Println("Password: ", res.Password)
-	fmt.Println("Meta: ", res.Meta)
-}
-
-func encryptPassword(key *rsa.PublicKey, password models.Password) (models.PasswordEncrypted, error) {
-	var err error
-	res := models.PasswordEncrypted{}
-	res.Login, err = crypt.EncryptWithPublicKey(key, []byte(password.Login))
-	if err != nil {
-		return res, err
+	records := resp.GetRecords()
+	data := models.RecordsEncrypted{}
+	if err = json.Unmarshal(records, &data); err != nil {
+		fmt.Printf("Error unmarshalling records: %v\n", err)
+		return
 	}
-	res.Password, err = crypt.EncryptWithPublicKey(key, []byte(password.Password))
-	if err != nil {
-		return res, err
+	resultEnc := make(map[models.ID][]byte)
+	switch t {
+	case models.RecordPassword:
+		for _, record := range data.Password {
+			resultEnc[record.ID] = record.Meta
+		}
+	case models.RecordText:
+		for _, record := range data.Text {
+			resultEnc[record.ID] = record.Meta
+		}
+	case models.RecordBin:
+		for _, record := range data.Bin {
+			resultEnc[record.ID] = record.Meta
+		}
+	case models.RecordBank:
+		for _, record := range data.Bank {
+			resultEnc[record.ID] = record.Meta
+		}
+	default:
 	}
-	res.Meta, err = crypt.EncryptWithPublicKey(key, []byte(password.Meta))
-	if err != nil {
-		return res, err
+	for id, record := range resultEnc {
+		decrypted, err := crypt.DecryptWithPrivateKey(c.privateKey, record)
+		if err != nil {
+			fmt.Printf("Error decrypting record: %v\n", err)
+			return
+		}
+		fmt.Printf("%d: %s\n", id, string(decrypted))
 	}
-	return res, nil
-}
-
-func decryptPassword(key *rsa.PrivateKey, password models.PasswordEncrypted) (models.Password, error) {
-	res := models.Password{}
-	res.ID = password.ID
-	login, err := crypt.DecryptWithPrivateKey(key, password.Login)
-	if err != nil {
-		return res, err
-	}
-	res.Login = string(login)
-	pwd, err := crypt.DecryptWithPrivateKey(key, password.Password)
-	if err != nil {
-		return res, err
-	}
-	res.Password = string(pwd)
-	meta, err := crypt.DecryptWithPrivateKey(key, password.Meta)
-	if err != nil {
-		return res, err
-	}
-	res.Meta = models.Meta(meta)
-	return res, nil
 }

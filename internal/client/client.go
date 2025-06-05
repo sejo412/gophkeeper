@@ -73,9 +73,6 @@ func (c *Client) Register(name string) error {
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
-	if resp.Error != nil {
-		return fmt.Errorf("failed to register user: %s", resp.GetError())
-	}
 	if err = helpers.SaveRegularFile(
 		filepath.Join(c.config.CacheDir, constants.CertCAPublicFilename),
 		resp.GetCaCertificate(), 0644,

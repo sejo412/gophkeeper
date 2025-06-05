@@ -91,7 +91,7 @@ type GRPCPrivate struct {
 	config privateConfig
 }
 
-func (s *GRPCPrivate) List(ctx context.Context, in *emptypb.Empty) (
+func (s *GRPCPrivate) ListAll(ctx context.Context, in *emptypb.Empty) (
 	*pb.ListResponse,
 	error,
 ) {
@@ -99,24 +99,35 @@ func (s *GRPCPrivate) List(ctx context.Context, in *emptypb.Empty) (
 	panic("implement me")
 }
 
+func (s *GRPCPrivate) List(ctx context.Context, in *pb.ListRequest) (*pb.ListResponse, error) {
+	ctxUID, _ := ctx.Value(ctxUIDKey).(int)
+	uid := models.UserID(ctxUID)
+	r, err := s.config.store.List(ctx, uid, protoRecordTypeToModel(in.GetType()))
+	if err != nil {
+		slog.Info("error listing records", "error", err)
+		return nil, fmt.Errorf("error listing records")
+	}
+	data, err := json.Marshal(r)
+	if err != nil {
+		slog.Info("error marshaling records", "error", err)
+		return nil, fmt.Errorf("error marshaling records")
+	}
+	return &pb.ListResponse{Records: data}, nil
+}
+
 func (s *GRPCPrivate) Create(ctx context.Context, in *pb.AddRecordRequest) (*emptypb.Empty, error) {
 	ctxUID, _ := ctx.Value(ctxUIDKey).(int)
 	uid := models.UserID(ctxUID)
-	switch in.GetType() {
-	case pb.RecordType_PASSWORD:
-		var record models.PasswordEncrypted
-		if err := json.Unmarshal(in.GetRecord(), &record); err != nil {
-			slog.Error("error unmarshalling password encrypted record")
-			return nil, status.Error(codes.Internal, "error unmarshalling password encrypted record")
-		}
-		if err := s.config.store.Add(
-			ctx, uid, models.RecordPassword, models.RecordEncrypted{Password: record},
-		); err != nil {
-			slog.Error("error adding record", "error", err)
-			return nil, status.Error(codes.Internal, "error adding record")
-		}
-	default:
-		return nil, status.Error(codes.InvalidArgument, "invalid type")
+	var record models.RecordEncrypted
+	if err := json.Unmarshal(in.GetRecord(), &record); err != nil {
+		msg := "error unmarshalling record"
+		slog.Info(msg)
+		return nil, status.Errorf(codes.InvalidArgument, msg)
+	}
+	if err := s.config.store.Add(ctx, uid, protoRecordTypeToModel(in.GetType()), record); err != nil {
+		msg := "error adding record"
+		slog.Info(msg, "error", err)
+		return nil, status.Errorf(codes.InvalidArgument, msg)
 	}
 	return &emptypb.Empty{}, nil
 }
@@ -124,26 +135,21 @@ func (s *GRPCPrivate) Create(ctx context.Context, in *pb.AddRecordRequest) (*emp
 func (s *GRPCPrivate) Read(ctx context.Context, in *pb.GetRecordRequest) (*pb.GetRecordResponse, error) {
 	ctxUID, _ := ctx.Value(ctxUIDKey).(int)
 	uid := models.UserID(ctxUID)
-	switch in.GetType() {
-	case pb.RecordType_PASSWORD:
-		r, err := s.config.store.Get(ctx, uid, models.RecordPassword, models.ID(in.GetRecordNumber()))
-		if err != nil {
-			slog.Error("error getting record", "error", err)
-			return nil, status.Error(codes.Internal, "error getting record")
-		}
-		data, err := json.Marshal(r)
-		if err != nil {
-			slog.Error("error marshalling record", "error", err)
-			return nil, status.Error(codes.Internal, "error marshalling record")
-		}
-		return &pb.GetRecordResponse{
-			Type:   protoRecordType(pb.RecordType_PASSWORD),
-			Record: data,
-			Error:  nil,
-		}, nil
-	default:
-		return nil, status.Error(codes.InvalidArgument, "invalid type")
+	r, err := s.config.store.Get(ctx, uid, protoRecordTypeToModel(in.GetType()), models.ID(in.GetRecordNumber()))
+	if err != nil {
+		slog.Error("error getting record", "error", err)
+		return nil, status.Error(codes.Internal, "error getting record")
 	}
+	data, err := json.Marshal(r)
+	if err != nil {
+		slog.Error("error marshalling record", "error", err)
+		return nil, status.Error(codes.Internal, "error marshalling record")
+	}
+	return &pb.GetRecordResponse{
+		Type:   in.Type,
+		Record: data,
+		Error:  nil,
+	}, nil
 }
 
 func (s *GRPCPrivate) Update(ctx context.Context, in *pb.UpdateRecordRequest) (*pb.UpdateRecordResponse, error) {
@@ -162,24 +168,18 @@ func (sp *GRPCPublic) Register(ctx context.Context, in *pb.RegisterRequest) (*pb
 	if err != nil {
 		*msg = err.Error()
 		slog.Error("parsing certificate request", "error", err)
-		return &pb.RegisterResponse{
-			Error: msg,
-		}, status.Error(codes.InvalidArgument, err.Error())
+		return &pb.RegisterResponse{}, status.Error(codes.InvalidArgument, err.Error())
 	}
 	if _, err = sp.config.store.NewUser(ctx, certRequest.CommonName); err != nil {
 		*msg = err.Error()
 		slog.Error("creating new user", "error", err)
-		return &pb.RegisterResponse{
-			Error: msg,
-		}, status.Error(codes.InvalidArgument, err.Error())
+		return &pb.RegisterResponse{}, status.Error(codes.InvalidArgument, err.Error())
 	}
 	cert, _, err := certs.GenRsaCert(certRequest, sp.config.signer)
 	if err != nil {
 		*msg = err.Error()
 		slog.Error("generating certificate", "error", err)
-		return &pb.RegisterResponse{
-			Error: msg,
-		}, status.Error(codes.Internal, internalError)
+		return &pb.RegisterResponse{}, status.Error(codes.Internal, internalError)
 	}
 	return &pb.RegisterResponse{
 		CaCertificate:     sp.config.signer.CACert,
@@ -272,4 +272,19 @@ func stringToPtr(s string) *string {
 
 func protoRecordType(r pb.RecordType) *pb.RecordType {
 	return &r
+}
+
+func protoRecordTypeToModel(r pb.RecordType) models.RecordType {
+	switch r {
+	case pb.RecordType_PASSWORD:
+		return models.RecordPassword
+	case pb.RecordType_TEXT:
+		return models.RecordText
+	case pb.RecordType_BIN:
+		return models.RecordBin
+	case pb.RecordType_BANK:
+		return models.RecordBank
+	default:
+		return models.RecordUnknown
+	}
 }

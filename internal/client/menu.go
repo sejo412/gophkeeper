@@ -90,18 +90,15 @@ func actionFunction(ctx context.Context, c *Client, object models.RecordType, ac
 	clearScreen()
 	fmt.Printf("%s: %s\n", object.String(), action.String())
 	scanner := bufio.NewScanner(os.Stdin)
-	switch object {
-	case models.RecordPassword:
-		switch action {
-		case ActionCreate:
-			createPassword(ctx, c, scanner)
-		case ActionRead:
-			getPassword(ctx, c, scanner)
-		default:
-			fmt.Printf("(action %q not supported for %q)\n", action.String(), object.String())
-		}
+	switch action {
+	case ActionList:
+		listRecords(ctx, c, object)
+	case ActionCreate:
+		createRecord(ctx, c, object, scanner)
+	case ActionRead:
+		readRecord(ctx, c, object, scanner)
 	default:
-		fmt.Println("(not implemented)")
+		fmt.Printf("(action %q not supported for %q)\n", action.String(), object.String())
 	}
 	waitForEnter()
 }

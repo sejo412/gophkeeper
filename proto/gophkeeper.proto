@@ -22,15 +22,14 @@ message RegisterResponse {
   reserved 1;
   bytes ca_certificate = 2;
   bytes client_certificate = 3;
-  string error = 4;
+}
+
+message ListRequest {
+  RecordType type = 1;
 }
 
 message ListResponse {
-  repeated bytes passwords = 1;
-  repeated bytes texts = 2;
-  repeated bytes bins = 3;
-  repeated bytes banks = 4;
-  string error = 5;
+  bytes records = 1;
 }
 
 message AddRecordRequest {
@@ -73,7 +72,8 @@ service Public {
 }
 
 service Private {
-  rpc List(google.protobuf.Empty) returns (ListResponse);
+  rpc ListAll(google.protobuf.Empty) returns (ListResponse);
+  rpc List(ListRequest) returns (ListResponse);
   rpc Create(AddRecordRequest) returns (google.protobuf.Empty);
   rpc Read(GetRecordRequest) returns (GetRecordResponse);
   rpc Update(UpdateRecordRequest) returns (UpdateRecordResponse);

@@ -12,6 +12,8 @@ type SubMenu int
 
 type Action int
 
+type Field int
+
 const (
 	MainTitle MainMenu = iota
 	MainList
@@ -70,6 +72,55 @@ const (
 	ActionUpdateName string = "Update"
 	ActionDeleteName string = "Delete"
 )
+
+const (
+	FieldID Field = iota
+	FieldLogin
+	FieldPassword
+	FieldText
+	FieldData
+	FieldNumber
+	FieldDate
+	FieldCVV
+	FieldMeta
+)
+
+const (
+	FieldIDName       string = "ID"
+	FieldLoginName    string = "Login"
+	FieldPasswordName string = "Password"
+	FieldTextName     string = "Text"
+	FieldDataName     string = "Data"
+	FieldNumberName   string = "Number"
+	FieldDateName     string = "Date"
+	FieldCVVName      string = "CVV"
+	FieldMetaName     string = "Meta"
+)
+
+func (f Field) String() string {
+	switch f {
+	case FieldID:
+		return FieldIDName
+	case FieldLogin:
+		return FieldLoginName
+	case FieldPassword:
+		return FieldPasswordName
+	case FieldText:
+		return FieldTextName
+	case FieldData:
+		return FieldDataName
+	case FieldNumber:
+		return FieldNumberName
+	case FieldDate:
+		return FieldDateName
+	case FieldCVV:
+		return FieldCVVName
+	case FieldMeta:
+		return FieldMetaName
+	default:
+		return "unknown field type"
+	}
+}
 
 func (m MainMenu) String() string {
 	switch m {
@@ -176,8 +227,53 @@ func protoRecordType(value pb.RecordType) *pb.RecordType {
 	return &value
 }
 
+func modelRecordTypeToProto(value models.RecordType) pb.RecordType {
+	switch value {
+	case models.RecordPassword:
+		return pb.RecordType_PASSWORD
+	case models.RecordText:
+		return pb.RecordType_TEXT
+	case models.RecordBin:
+		return pb.RecordType_BIN
+	case models.RecordBank:
+		return pb.RecordType_BANK
+	default:
+		return pb.RecordType_UNKNOWN
+	}
+}
+
 func protoID(value int) *int64 {
 	res := new(int64)
 	*res = int64(value)
 	return res
+}
+
+func fields(t models.RecordType) []Field {
+	switch t {
+	case models.RecordPassword:
+		return []Field{
+			FieldLogin,
+			FieldPassword,
+			FieldMeta,
+		}
+	case models.RecordText:
+		return []Field{
+			FieldText,
+			FieldMeta,
+		}
+	case models.RecordBin:
+		return []Field{
+			FieldData,
+			FieldMeta,
+		}
+	case models.RecordBank:
+		return []Field{
+			FieldNumber,
+			FieldDate,
+			FieldCVV,
+			FieldMeta,
+		}
+	default:
+		return nil
+	}
 }

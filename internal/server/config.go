@@ -1,11 +1,8 @@
 package server
 
 import (
-	"context"
 	"os/user"
 	"path/filepath"
-
-	"github.com/sejo412/gophkeeper/internal/models"
 )
 
 type Config struct {
