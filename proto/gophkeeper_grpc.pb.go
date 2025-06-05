@@ -138,8 +138,8 @@ type PrivateClient interface {
 	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
 	Create(ctx context.Context, in *AddRecordRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Read(ctx context.Context, in *GetRecordRequest, opts ...grpc.CallOption) (*GetRecordResponse, error)
-	Update(ctx context.Context, in *UpdateRecordRequest, opts ...grpc.CallOption) (*UpdateRecordResponse, error)
-	Delete(ctx context.Context, in *DeleteRecordRequest, opts ...grpc.CallOption) (*DeleteRecordResponse, error)
+	Update(ctx context.Context, in *UpdateRecordRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Delete(ctx context.Context, in *DeleteRecordRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type privateClient struct {
@@ -190,9 +190,9 @@ func (c *privateClient) Read(ctx context.Context, in *GetRecordRequest, opts ...
 	return out, nil
 }
 
-func (c *privateClient) Update(ctx context.Context, in *UpdateRecordRequest, opts ...grpc.CallOption) (*UpdateRecordResponse, error) {
+func (c *privateClient) Update(ctx context.Context, in *UpdateRecordRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UpdateRecordResponse)
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, Private_Update_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -200,9 +200,9 @@ func (c *privateClient) Update(ctx context.Context, in *UpdateRecordRequest, opt
 	return out, nil
 }
 
-func (c *privateClient) Delete(ctx context.Context, in *DeleteRecordRequest, opts ...grpc.CallOption) (*DeleteRecordResponse, error) {
+func (c *privateClient) Delete(ctx context.Context, in *DeleteRecordRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DeleteRecordResponse)
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, Private_Delete_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -218,8 +218,8 @@ type PrivateServer interface {
 	List(context.Context, *ListRequest) (*ListResponse, error)
 	Create(context.Context, *AddRecordRequest) (*emptypb.Empty, error)
 	Read(context.Context, *GetRecordRequest) (*GetRecordResponse, error)
-	Update(context.Context, *UpdateRecordRequest) (*UpdateRecordResponse, error)
-	Delete(context.Context, *DeleteRecordRequest) (*DeleteRecordResponse, error)
+	Update(context.Context, *UpdateRecordRequest) (*emptypb.Empty, error)
+	Delete(context.Context, *DeleteRecordRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedPrivateServer()
 }
 
@@ -242,10 +242,10 @@ func (UnimplementedPrivateServer) Create(context.Context, *AddRecordRequest) (*e
 func (UnimplementedPrivateServer) Read(context.Context, *GetRecordRequest) (*GetRecordResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Read not implemented")
 }
-func (UnimplementedPrivateServer) Update(context.Context, *UpdateRecordRequest) (*UpdateRecordResponse, error) {
+func (UnimplementedPrivateServer) Update(context.Context, *UpdateRecordRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
 }
-func (UnimplementedPrivateServer) Delete(context.Context, *DeleteRecordRequest) (*DeleteRecordResponse, error) {
+func (UnimplementedPrivateServer) Delete(context.Context, *DeleteRecordRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
 }
 func (UnimplementedPrivateServer) mustEmbedUnimplementedPrivateServer() {}

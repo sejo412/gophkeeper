@@ -24,7 +24,7 @@ func mainMenu(ctx context.Context, c *Client) {
 
 		switch input {
 		case MainList.Key():
-			listAllRecords()
+			listAllRecords(ctx, c)
 		case MainPasswords.Key():
 			subMenu(ctx, c, MainPasswords)
 		case MainBanks.Key():
@@ -80,12 +80,6 @@ func subMenu(ctx context.Context, c *Client, parent MainMenu) {
 	}
 }
 
-func listAllRecords() {
-	clearScreen()
-	fmt.Println("\nListing all records (not implemented).")
-	waitForEnter()
-}
-
 func actionFunction(ctx context.Context, c *Client, object models.RecordType, action Action) {
 	clearScreen()
 	fmt.Printf("%s: %s\n", object.String(), action.String())
@@ -97,6 +91,10 @@ func actionFunction(ctx context.Context, c *Client, object models.RecordType, ac
 		createRecord(ctx, c, object, scanner)
 	case ActionRead:
 		readRecord(ctx, c, object, scanner)
+	case ActionUpdate:
+		updateRecord(ctx, c, object, scanner)
+	case ActionDelete:
+		deleteRecord(ctx, c, object, scanner)
 	default:
 		fmt.Printf("(action %q not supported for %q)\n", action.String(), object.String())
 	}

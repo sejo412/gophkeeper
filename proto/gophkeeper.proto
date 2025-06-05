@@ -54,17 +54,9 @@ message UpdateRecordRequest {
   bytes record = 3;
 }
 
-message UpdateRecordResponse {
-  string error = 1;
-}
-
 message DeleteRecordRequest {
   RecordType type = 1;
   int64 record_number = 2;
-}
-
-message DeleteRecordResponse {
-  string error = 1;
 }
 
 service Public {
@@ -76,6 +68,6 @@ service Private {
   rpc List(ListRequest) returns (ListResponse);
   rpc Create(AddRecordRequest) returns (google.protobuf.Empty);
   rpc Read(GetRecordRequest) returns (GetRecordResponse);
-  rpc Update(UpdateRecordRequest) returns (UpdateRecordResponse);
-  rpc Delete(DeleteRecordRequest) returns (DeleteRecordResponse);
+  rpc Update(UpdateRecordRequest) returns (google.protobuf.Empty);
+  rpc Delete(DeleteRecordRequest) returns (google.protobuf.Empty);
 }

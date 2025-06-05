@@ -95,8 +95,19 @@ func (s *GRPCPrivate) ListAll(ctx context.Context, in *emptypb.Empty) (
 	*pb.ListResponse,
 	error,
 ) {
-	// TODO implement me
-	panic("implement me")
+	ctxUID, _ := ctx.Value(ctxUIDKey).(int)
+	uid := models.UserID(ctxUID)
+	r, err := s.config.store.ListAll(ctx, uid)
+	if err != nil {
+		slog.Info("error listing records", "error", err)
+		return nil, fmt.Errorf("error listing records")
+	}
+	data, err := json.Marshal(r)
+	if err != nil {
+		slog.Info("error marshaling records", "error", err)
+		return nil, fmt.Errorf("error marshaling records")
+	}
+	return &pb.ListResponse{Records: data}, nil
 }
 
 func (s *GRPCPrivate) List(ctx context.Context, in *pb.ListRequest) (*pb.ListResponse, error) {
@@ -152,14 +163,38 @@ func (s *GRPCPrivate) Read(ctx context.Context, in *pb.GetRecordRequest) (*pb.Ge
 	}, nil
 }
 
-func (s *GRPCPrivate) Update(ctx context.Context, in *pb.UpdateRecordRequest) (*pb.UpdateRecordResponse, error) {
-	// TODO implement me
-	panic("implement me")
+func (s *GRPCPrivate) Update(ctx context.Context, in *pb.UpdateRecordRequest) (*emptypb.Empty, error) {
+	ctxUID, _ := ctx.Value(ctxUIDKey).(int)
+	uid := models.UserID(ctxUID)
+	var record models.RecordEncrypted
+	if err := json.Unmarshal(in.GetRecord(), &record); err != nil {
+		msg := "error unmarshalling record"
+		slog.Info(msg, "error", err)
+		return nil, status.Errorf(codes.InvalidArgument, msg)
+	}
+	if err := s.config.store.Update(
+		ctx, uid, protoRecordTypeToModel(in.GetType()), models.ID(in.GetRecordNumber()),
+		record,
+	); err != nil {
+		msg := "error updating record"
+		slog.Info(msg, "error", err)
+		return nil, status.Errorf(codes.InvalidArgument, msg)
+	}
+	return &emptypb.Empty{}, nil
 }
 
-func (s *GRPCPrivate) Delete(ctx context.Context, in *pb.DeleteRecordRequest) (*pb.DeleteRecordResponse, error) {
-	// TODO implement me
-	panic("implement me")
+func (s *GRPCPrivate) Delete(ctx context.Context, in *pb.DeleteRecordRequest) (*emptypb.Empty, error) {
+	ctxUID, _ := ctx.Value(ctxUIDKey).(int)
+	uid := models.UserID(ctxUID)
+	if err := s.config.store.Delete(
+		ctx, uid, protoRecordTypeToModel(in.GetType()),
+		models.ID(in.GetRecordNumber()),
+	); err != nil {
+		msg := "error deleting record"
+		slog.Info(msg, "error", err)
+		return nil, status.Errorf(codes.InvalidArgument, msg)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func (sp *GRPCPublic) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.RegisterResponse, error) {
@@ -264,14 +299,6 @@ func grpcPrivateServerOptions(server *GRPCPrivate, creds credentials.TransportCr
 
 func registerGRPCPrivateServer(grpc *grpc.Server, server *GRPCPrivate) {
 	pb.RegisterPrivateServer(grpc, server)
-}
-
-func stringToPtr(s string) *string {
-	return &s
-}
-
-func protoRecordType(r pb.RecordType) *pb.RecordType {
-	return &r
 }
 
 func protoRecordTypeToModel(r pb.RecordType) models.RecordType {
