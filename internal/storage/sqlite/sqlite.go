@@ -75,58 +75,172 @@ func (s *Storage) Close() error {
 	return s.db.Close()
 }
 
-func (s *Storage) List(ctx context.Context, uid models.UserID) (models.RecordsEncrypted, error) {
-	var recs models.RecordsEncrypted
-	passwords, err := s.getPasswords(ctx, uid)
-	if err != nil {
-		return recs, err
+func (s *Storage) ListAll(ctx context.Context, uid models.UserID) (models.RecordsEncrypted, error) {
+	result := models.RecordsEncrypted{}
+	for _, recType := range []models.RecordType{
+		models.RecordPassword,
+		models.RecordText,
+		models.RecordBin,
+		models.RecordBank,
+	} {
+		records, err := s.List(ctx, uid, recType)
+		if err != nil {
+			return models.RecordsEncrypted{}, fmt.Errorf("failed to list %q: %w", recType.String(), err)
+		}
+		switch recType {
+		case models.RecordPassword:
+			result.Password = records.Password
+		case models.RecordText:
+			result.Text = records.Text
+		case models.RecordBin:
+			result.Bin = records.Bin
+		case models.RecordBank:
+			result.Bank = records.Bank
+		default:
+		}
 	}
-	recs.Password = passwords
-	return recs, nil
+	return result, nil
+}
+
+func (s *Storage) List(ctx context.Context, uid models.UserID, t models.RecordType) (models.RecordsEncrypted, error) {
+	args := []interface{}{uid}
+	rows, err := s.db.QueryContext(ctx, actions[t][actionList].query, args...)
+	if err != nil {
+		return models.RecordsEncrypted{}, fmt.Errorf("failed query %q: %w", t.String(), err)
+	}
+	if rows.Err() != nil {
+		return models.RecordsEncrypted{}, fmt.Errorf("failed get %s: %w", t.String(), rows.Err())
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+	result := models.RecordsEncrypted{
+		Password: []models.PasswordEncrypted{},
+		Text:     []models.TextEncrypted{},
+		Bin:      []models.BinEncrypted{},
+		Bank:     []models.BankEncrypted{},
+	}
+	for rows.Next() {
+		var id models.ID
+		var meta []byte
+		if err = rows.Scan(&id, &meta); err != nil {
+			return models.RecordsEncrypted{}, fmt.Errorf("failed scan %q: %w", t.String(), err)
+		}
+		switch t {
+		case models.RecordPassword:
+			result.Password = append(
+				result.Password, models.PasswordEncrypted{
+					ID:   id,
+					Meta: meta,
+				},
+			)
+		case models.RecordText:
+			result.Text = append(
+				result.Text, models.TextEncrypted{
+					ID:   id,
+					Meta: meta,
+				},
+			)
+		case models.RecordBin:
+			result.Bin = append(
+				result.Bin, models.BinEncrypted{
+					ID:   id,
+					Meta: meta,
+				},
+			)
+		case models.RecordBank:
+			result.Bank = append(
+				result.Bank, models.BankEncrypted{
+					ID:   id,
+					Meta: meta,
+				},
+			)
+		default:
+		}
+	}
+	return result, nil
 }
 
 func (s *Storage) Get(
-	ctx context.Context, user models.UserID, t models.RecordType,
+	ctx context.Context, uid models.UserID, t models.RecordType,
 	id models.ID,
 ) (models.RecordEncrypted, error) {
-	var rec models.RecordEncrypted
+	args := []interface{}{id, uid}
+	rec := models.RecordEncrypted{
+		Password: models.PasswordEncrypted{},
+		Text:     models.TextEncrypted{},
+		Bin:      models.BinEncrypted{},
+		Bank:     models.BankEncrypted{},
+	}
+	row := s.db.QueryRowContext(ctx, actions[t][actionRead].query, args...)
+	var err error
 	switch t {
 	case models.RecordPassword:
-		passwords, err := s.getPasswords(ctx, user)
-		if err != nil {
-			return rec, err
-		}
-		for _, password := range passwords {
-			if password.ID == id {
-				rec.Password = password
-				return rec, nil
-			}
-		}
-		return rec, fmt.Errorf("record not found")
+		err = row.Scan(&rec.Password.ID, &rec.Password.Login, &rec.Password.Password, &rec.Password.Meta)
+	case models.RecordText:
+		err = row.Scan(&rec.Text.ID, &rec.Text.Text, &rec.Text.Meta)
+	case models.RecordBin:
+		err = row.Scan(&rec.Bin.ID, &rec.Bin.Data, &rec.Bin.Meta)
+	case models.RecordBank:
+		err = row.Scan(&rec.Bank.ID, &rec.Bank.Number, &rec.Bank.Date, &rec.Bank.Cvv)
 	default:
-		return rec, errors.New("invalid record type")
+		err = errors.New("unknown record")
 	}
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.RecordEncrypted{}, fmt.Errorf("%q with %d not found", t.String(), id)
+		} else {
+			return models.RecordEncrypted{}, err
+		}
+	}
+	return rec, nil
 }
 
 func (s *Storage) Delete(ctx context.Context, uid models.UserID, t models.RecordType, id models.ID) error {
-	switch t {
-	case models.RecordPassword:
-		return s.delPassword(ctx, uid, models.Password{ID: id})
-	default:
-		return errors.New("invalid record type")
+	args := []interface{}{id, uid}
+	res, err := s.db.ExecContext(ctx, actions[t][actionDelete].query, args...)
+	if err != nil {
+		return fmt.Errorf("failed delete %q with id %d: %w", t.String(), id, err)
 	}
+	rowsCount, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed get rows affected: %w", err)
+	}
+	if rowsCount == 0 {
+		return fmt.Errorf("nothing to delete")
+	}
+	return nil
 }
 
 func (s *Storage) Update(
 	ctx context.Context, uid models.UserID, t models.RecordType, id models.ID,
 	record models.RecordEncrypted,
 ) error {
+	var args []interface{}
 	switch t {
 	case models.RecordPassword:
-		return s.updatePassword(ctx, uid, id, record.Password.Login, record.Password.Password, record.Password.Meta)
+		args = []interface{}{record.Password.Login, record.Password.Password, record.Password.Meta, id, uid}
+	case models.RecordText:
+		args = []interface{}{record.Text.Text, record.Text.Meta, id, uid}
+	case models.RecordBin:
+		args = []interface{}{record.Bin.Data, record.Bin.Meta, id, uid}
+	case models.RecordBank:
+		args = []interface{}{record.Bank.Number, record.Bank.Date, record.Bank.Cvv, record.Bank.Meta, id, uid}
 	default:
 		return errors.New("invalid record type")
 	}
+	res, err := s.db.ExecContext(ctx, actions[t][actionUpdate].query, args...)
+	if err != nil {
+		return fmt.Errorf("failed update %q for userID %d: %w", t.String(), uid, err)
+	}
+	rowCount, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed get rows affected: %w", err)
+	}
+	if rowCount == 0 {
+		return fmt.Errorf("no records updated for userID %d", uid)
+	}
+	return nil
 }
 
 func (s *Storage) Add(
@@ -136,13 +250,23 @@ func (s *Storage) Add(
 	if ok, err := s.IsUserExist(ctx, uid); err != nil || !ok {
 		return fmt.Errorf("user id %q not exist or error: %w", uid, err)
 	}
+	var args []interface{}
 	switch t {
 	case models.RecordPassword:
-		return s.addPassword(ctx, uid, record.Password.Login, record.Password.Password, record.Password.Meta)
+		args = []interface{}{uid, record.Password.Login, record.Password.Password, record.Password.Meta}
+	case models.RecordText:
+		args = []interface{}{uid, record.Text.Text, record.Text.Meta}
+	case models.RecordBin:
+		args = []interface{}{uid, record.Bin.Data, record.Bin.Meta}
+	case models.RecordBank:
+		args = []interface{}{uid, record.Bank.Number, record.Bank.Date, record.Bank.Cvv, record.Bank.Meta}
 	default:
 		return fmt.Errorf("invalid record type: %q", t)
 	}
-
+	if _, err := s.db.ExecContext(ctx, actions[t][actionCreate].query, args...); err != nil {
+		return fmt.Errorf("failed create record %q for %d: %w", t.String(), uid, err)
+	}
+	return nil
 }
 
 func (s *Storage) IsExist(ctx context.Context, uid models.UserID, t models.RecordType, id models.ID) (bool, error) {
@@ -261,87 +385,6 @@ func (s *Storage) GetUserID(ctx context.Context, cn string) (models.UserID, erro
 	}
 	result := models.UserID(uid)
 	return result, nil
-}
-
-func (s *Storage) addPassword(ctx context.Context, uid models.UserID, login, password, meta []byte) error {
-	q := query{
-		query: queryWithTable("INSERT INTO %s(uid, login, password, meta) VALUES (?, ?, ?, ?)", tablePasswords),
-		args:  []interface{}{uid, login, password, meta},
-	}
-	if _, err := s.db.ExecContext(ctx, q.query, q.args...); err != nil {
-		return fmt.Errorf("failed add password for userID %d: %w", uid, err)
-	}
-	return nil
-}
-
-func (s *Storage) delPassword(ctx context.Context, uid models.UserID, password models.Password) error {
-	q := query{
-		query: queryWithTable("DELETE FROM %s WHERE id = ? AND uid = ?", tablePasswords),
-		args:  []interface{}{password.ID, uid},
-	}
-	res, err := s.db.ExecContext(ctx, q.query, q.args...)
-	if err != nil {
-		return fmt.Errorf("failed delete from %q: %w", q.table.String(), err)
-	}
-	rowsCount, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed get rows affected: %w", err)
-	}
-	if rowsCount == 0 {
-		return fmt.Errorf("no rows affected")
-	}
-	return nil
-}
-
-func (s *Storage) getPasswords(ctx context.Context, uid models.UserID) ([]models.PasswordEncrypted, error) {
-	q := query{
-		query: queryWithTable("SELECT id, login, password, meta FROM %s WHERE uid = ?", tablePasswords),
-		args:  []interface{}{uid},
-	}
-	results := make([]models.PasswordEncrypted, 0)
-	rows, err := s.db.QueryContext(ctx, q.query, q.args...)
-	if err != nil {
-		return results, fmt.Errorf("failed query passwords: %w", err)
-	}
-	if rows.Err() != nil {
-		return results, fmt.Errorf("failed get passwords: %w", rows.Err())
-	}
-	defer func() {
-		_ = rows.Close()
-	}()
-	for rows.Next() {
-		rec := &models.PasswordEncrypted{}
-		if err := rows.Scan(&rec.ID, &rec.Login, &rec.Password, &rec.Meta); err != nil {
-			return results, fmt.Errorf("failed scan passwords: %w", err)
-		}
-		results = append(results, *rec)
-	}
-	return results, nil
-}
-
-func (s *Storage) updatePassword(
-	ctx context.Context, uid models.UserID, id models.ID,
-	newLogin, newPassword, newMeta []byte,
-) error {
-	q := query{
-		query: queryWithTable(
-			"UPDATE %s SET login = ?, password = ?, meta = ? WHERE uid = ? AND id = ?",
-			tablePasswords,
-		),
-		args: []interface{}{newLogin, newPassword, newMeta, uid, id},
-	}
-	res, err := s.db.ExecContext(ctx, q.query, q.args...)
-	if err != nil {
-		return fmt.Errorf("failed update password for userID %d: %w", uid, err)
-	}
-	rowCount, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed get rows affected: %w", err)
-	}
-	if rowCount == 0 {
-		return fmt.Errorf("no rows affected for userID %d", uid)
-	}
-	return nil
 }
 
 func queryWithTable(q string, t table) string {

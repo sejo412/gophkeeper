@@ -83,13 +83,15 @@ func TestNew(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := New(tt.args.path)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				_, err := New(tt.args.path)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+			},
+		)
 	}
 }
 
@@ -118,14 +120,16 @@ func TestStorage_Init(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Storage{
-				db: tt.fields.db,
-			}
-			if err := s.Init(tt.args.ctx); (err != nil) != tt.wantErr {
-				t.Errorf("Init() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				s := &Storage{
+					db: tt.fields.db,
+				}
+				if err := s.Init(tt.args.ctx); (err != nil) != tt.wantErr {
+					t.Errorf("Init() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			},
+		)
 	}
 }
 
@@ -170,19 +174,21 @@ func TestStorage_NewUser(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Storage{
-				db: tt.fields.db,
-			}
-			got, err := s.NewUser(tt.args.ctx, tt.args.cn)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("NewUser() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewUser() got = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				s := &Storage{
+					db: tt.fields.db,
+				}
+				got, err := s.NewUser(tt.args.ctx, tt.args.cn)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("NewUser() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("NewUser() got = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
 
@@ -228,19 +234,21 @@ func TestStorage_userIDbyCn(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Storage{
-				db: tt.fields.db,
-			}
-			got, err := s.GetUserID(tt.args.ctx, tt.args.cn)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("userIDbyCn() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("userIDbyCn() got = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				s := &Storage{
+					db: tt.fields.db,
+				}
+				got, err := s.GetUserID(tt.args.ctx, tt.args.cn)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("userIDbyCn() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("userIDbyCn() got = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
 
@@ -273,19 +281,21 @@ func TestStorage_Users(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Storage{
-				db: tt.fields.db,
-			}
-			got, err := s.Users(tt.args.ctx)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Users() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Users() got = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				s := &Storage{
+					db: tt.fields.db,
+				}
+				got, err := s.Users(tt.args.ctx)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("Users() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("Users() got = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
 
@@ -330,19 +340,21 @@ func TestStorage_IsUserExist(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Storage{
-				db: tt.fields.db,
-			}
-			got, err := s.IsUserExist(tt.args.ctx, tt.args.user)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("IsUserExist() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("IsUserExist() got = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				s := &Storage{
+					db: tt.fields.db,
+				}
+				got, err := s.IsUserExist(tt.args.ctx, tt.args.user)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("IsUserExist() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if got != tt.want {
+					t.Errorf("IsUserExist() got = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
 
@@ -394,14 +406,16 @@ func TestStorage_Add(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Storage{
-				db: tt.fields.db,
-			}
-			if err := s.Add(tt.args.ctx, tt.args.user, tt.args.t, tt.args.record); (err != nil) != tt.wantErr {
-				t.Errorf("Add() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				s := &Storage{
+					db: tt.fields.db,
+				}
+				if err := s.Add(tt.args.ctx, tt.args.user, tt.args.t, tt.args.record); (err != nil) != tt.wantErr {
+					t.Errorf("Add() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			},
+		)
 	}
 }
 
@@ -452,19 +466,21 @@ func TestStorage_IsExist(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Storage{
-				db: tt.fields.db,
-			}
-			got, err := s.IsExist(tt.args.ctx, tt.args.user, tt.args.t, tt.args.id)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("IsExist() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("IsExist() got = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				s := &Storage{
+					db: tt.fields.db,
+				}
+				got, err := s.IsExist(tt.args.ctx, tt.args.user, tt.args.t, tt.args.id)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("IsExist() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if got != tt.want {
+					t.Errorf("IsExist() got = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
 
@@ -499,19 +515,21 @@ func TestStorage_List(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Storage{
-				db: tt.fields.db,
-			}
-			got, err := s.List(tt.args.ctx, tt.args.user)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("List() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("List() got = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				s := &Storage{
+					db: tt.fields.db,
+				}
+				got, err := s.ListAll(tt.args.ctx, tt.args.user)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("ListAll() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("ListAll() got = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
 
@@ -564,19 +582,21 @@ func TestStorage_Get(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Storage{
-				db: tt.fields.db,
-			}
-			got, err := s.Get(tt.args.ctx, tt.args.user, tt.args.t, tt.args.id)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Get() got = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				s := &Storage{
+					db: tt.fields.db,
+				}
+				got, err := s.Get(tt.args.ctx, tt.args.user, tt.args.t, tt.args.id)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("Get() got = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
 
@@ -639,15 +659,19 @@ func TestStorage_Update(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Storage{
-				db: tt.fields.db,
-			}
-			if err := s.Update(tt.args.ctx, tt.args.user, tt.args.t, tt.args.id,
-				tt.args.record); (err != nil) != tt.wantErr {
-				t.Errorf("Update() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				s := &Storage{
+					db: tt.fields.db,
+				}
+				if err := s.Update(
+					tt.args.ctx, tt.args.user, tt.args.t, tt.args.id,
+					tt.args.record,
+				); (err != nil) != tt.wantErr {
+					t.Errorf("Update() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			},
+		)
 	}
 }
 
@@ -695,13 +719,15 @@ func TestStorage_Delete(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Storage{
-				db: tt.fields.db,
-			}
-			if err := s.Delete(tt.args.ctx, tt.args.user, tt.args.t, tt.args.id); (err != nil) != tt.wantErr {
-				t.Errorf("Delete() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				s := &Storage{
+					db: tt.fields.db,
+				}
+				if err := s.Delete(tt.args.ctx, tt.args.user, tt.args.t, tt.args.id); (err != nil) != tt.wantErr {
+					t.Errorf("Delete() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			},
+		)
 	}
 }

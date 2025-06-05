@@ -24,6 +24,17 @@ const (
 	tableBanksName     string = "banks"
 )
 
+type action int
+
+const (
+	actionUnknown action = iota
+	actionCreate
+	actionRead
+	actionUpdate
+	actionDelete
+	actionList
+)
+
 type query struct {
 	table table
 	query string
