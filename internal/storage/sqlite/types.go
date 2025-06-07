@@ -41,6 +41,7 @@ type query struct {
 	args  []any
 }
 
+// String implements Stringer() interface.
 func (t table) String() string {
 	switch t {
 	case tableUnknown:

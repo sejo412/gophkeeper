@@ -491,6 +491,7 @@ func TestStorage_List(t *testing.T) {
 	type args struct {
 		ctx  context.Context
 		user models.UserID
+		t    models.RecordType
 	}
 	tests := []struct {
 		name    string
@@ -507,9 +508,18 @@ func TestStorage_List(t *testing.T) {
 			args: args{
 				ctx:  context.Background(),
 				user: testUser1.ID,
+				t:    models.RecordPassword,
 			},
 			want: models.RecordsEncrypted{
-				Password: []models.PasswordEncrypted{testPasswordEncrypted1},
+				Password: []models.PasswordEncrypted{
+					{
+						ID:   testPasswordEncrypted1.ID,
+						Meta: testPasswordEncrypted1.Meta,
+					},
+				},
+				Text: []models.TextEncrypted{},
+				Bin:  []models.BinEncrypted{},
+				Bank: []models.BankEncrypted{},
 			},
 			wantErr: false,
 		},
@@ -520,13 +530,13 @@ func TestStorage_List(t *testing.T) {
 				s := &Storage{
 					db: tt.fields.db,
 				}
-				got, err := s.ListAll(tt.args.ctx, tt.args.user)
+				got, err := s.List(tt.args.ctx, tt.args.user, tt.args.t)
 				if (err != nil) != tt.wantErr {
-					t.Errorf("ListAll() error = %v, wantErr %v", err, tt.wantErr)
+					t.Errorf("List() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
 				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("ListAll() got = %v, want %v", got, tt.want)
+					t.Errorf("List() got = %v, want %v", got, tt.want)
 				}
 			},
 		)
@@ -578,7 +588,7 @@ func TestStorage_Get(t *testing.T) {
 				id:   models.ID(1),
 			},
 			want:    models.RecordEncrypted{},
-			wantErr: false,
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {

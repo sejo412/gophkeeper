@@ -21,9 +21,21 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 )
 
-const internalError = "internal error"
-const ctxCNKey = "CommonName"
-const ctxUIDKey = "UserID"
+const (
+	errorInternal  = "internal error"
+	errorDelete    = "error deleting record"
+	errorList      = "error listing records"
+	errorMarshal   = "error marshalling record"
+	errorUnmarshal = "error unmarshalling record"
+	errorAdd       = "error adding record"
+	errorGet       = "error getting record"
+	errorUpdate    = "error updating record"
+)
+
+type ctxKey string
+
+const ctxCNKey ctxKey = "CommonName"
+const ctxUIDKey ctxKey = "UserID"
 
 type publicConfig struct {
 	port   int
@@ -99,13 +111,13 @@ func (s *GRPCPrivate) ListAll(ctx context.Context, in *emptypb.Empty) (
 	uid := models.UserID(ctxUID)
 	r, err := s.config.store.ListAll(ctx, uid)
 	if err != nil {
-		slog.Info("error listing records", "error", err)
-		return nil, fmt.Errorf("error listing records")
+		slog.Info(errorList, "error", err)
+		return nil, status.Error(codes.Internal, errorList)
 	}
 	data, err := json.Marshal(r)
 	if err != nil {
-		slog.Info("error marshaling records", "error", err)
-		return nil, fmt.Errorf("error marshaling records")
+		slog.Info(errorMarshal, "error", err)
+		return nil, status.Error(codes.Internal, errorMarshal)
 	}
 	return &pb.ListResponse{Records: data}, nil
 }
@@ -115,13 +127,13 @@ func (s *GRPCPrivate) List(ctx context.Context, in *pb.ListRequest) (*pb.ListRes
 	uid := models.UserID(ctxUID)
 	r, err := s.config.store.List(ctx, uid, protoRecordTypeToModel(in.GetType()))
 	if err != nil {
-		slog.Info("error listing records", "error", err)
-		return nil, fmt.Errorf("error listing records")
+		slog.Info(errorList, "error", err)
+		return nil, status.Error(codes.Internal, errorList)
 	}
 	data, err := json.Marshal(r)
 	if err != nil {
-		slog.Info("error marshaling records", "error", err)
-		return nil, fmt.Errorf("error marshaling records")
+		slog.Info(errorMarshal, "error", err)
+		return nil, status.Error(codes.Internal, errorMarshal)
 	}
 	return &pb.ListResponse{Records: data}, nil
 }
@@ -131,14 +143,12 @@ func (s *GRPCPrivate) Create(ctx context.Context, in *pb.AddRecordRequest) (*emp
 	uid := models.UserID(ctxUID)
 	var record models.RecordEncrypted
 	if err := json.Unmarshal(in.GetRecord(), &record); err != nil {
-		msg := "error unmarshalling record"
-		slog.Info(msg)
-		return nil, status.Errorf(codes.InvalidArgument, msg)
+		slog.Info(errorUnmarshal, "error", err)
+		return nil, status.Errorf(codes.InvalidArgument, errorUnmarshal)
 	}
 	if err := s.config.store.Add(ctx, uid, protoRecordTypeToModel(in.GetType()), record); err != nil {
-		msg := "error adding record"
-		slog.Info(msg, "error", err)
-		return nil, status.Errorf(codes.InvalidArgument, msg)
+		slog.Info(errorAdd, "error", err)
+		return nil, status.Errorf(codes.InvalidArgument, errorAdd)
 	}
 	return &emptypb.Empty{}, nil
 }
@@ -148,13 +158,13 @@ func (s *GRPCPrivate) Read(ctx context.Context, in *pb.GetRecordRequest) (*pb.Ge
 	uid := models.UserID(ctxUID)
 	r, err := s.config.store.Get(ctx, uid, protoRecordTypeToModel(in.GetType()), models.ID(in.GetRecordNumber()))
 	if err != nil {
-		slog.Error("error getting record", "error", err)
-		return nil, status.Error(codes.Internal, "error getting record")
+		slog.Error(errorGet, "error", err)
+		return nil, status.Error(codes.Internal, errorGet)
 	}
 	data, err := json.Marshal(r)
 	if err != nil {
-		slog.Error("error marshalling record", "error", err)
-		return nil, status.Error(codes.Internal, "error marshalling record")
+		slog.Error(errorMarshal, "error", err)
+		return nil, status.Error(codes.Internal, errorMarshal)
 	}
 	return &pb.GetRecordResponse{
 		Type:   in.Type,
@@ -168,17 +178,15 @@ func (s *GRPCPrivate) Update(ctx context.Context, in *pb.UpdateRecordRequest) (*
 	uid := models.UserID(ctxUID)
 	var record models.RecordEncrypted
 	if err := json.Unmarshal(in.GetRecord(), &record); err != nil {
-		msg := "error unmarshalling record"
-		slog.Info(msg, "error", err)
-		return nil, status.Errorf(codes.InvalidArgument, msg)
+		slog.Info(errorUnmarshal, "error", err)
+		return nil, status.Errorf(codes.InvalidArgument, errorUnmarshal)
 	}
 	if err := s.config.store.Update(
 		ctx, uid, protoRecordTypeToModel(in.GetType()), models.ID(in.GetRecordNumber()),
 		record,
 	); err != nil {
-		msg := "error updating record"
-		slog.Info(msg, "error", err)
-		return nil, status.Errorf(codes.InvalidArgument, msg)
+		slog.Info(errorUpdate, "error", err)
+		return nil, status.Errorf(codes.InvalidArgument, errorUpdate)
 	}
 	return &emptypb.Empty{}, nil
 }
@@ -190,9 +198,8 @@ func (s *GRPCPrivate) Delete(ctx context.Context, in *pb.DeleteRecordRequest) (*
 		ctx, uid, protoRecordTypeToModel(in.GetType()),
 		models.ID(in.GetRecordNumber()),
 	); err != nil {
-		msg := "error deleting record"
-		slog.Info(msg, "error", err)
-		return nil, status.Errorf(codes.InvalidArgument, msg)
+		slog.Info(errorDelete, "error", err)
+		return nil, status.Errorf(codes.InvalidArgument, errorDelete)
 	}
 	return &emptypb.Empty{}, nil
 }
@@ -214,7 +221,7 @@ func (sp *GRPCPublic) Register(ctx context.Context, in *pb.RegisterRequest) (*pb
 	if err != nil {
 		*msg = err.Error()
 		slog.Error("generating certificate", "error", err)
-		return &pb.RegisterResponse{}, status.Error(codes.Internal, internalError)
+		return &pb.RegisterResponse{}, status.Error(codes.Internal, errorInternal)
 	}
 	return &pb.RegisterResponse{
 		CaCertificate:     sp.config.signer.CACert,

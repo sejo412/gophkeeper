@@ -10,10 +10,12 @@ import (
 	"github.com/sejo412/gophkeeper/internal/models"
 )
 
+// Storage implements server.Storage interface.
 type Storage struct {
 	db *sql.DB
 }
 
+// New constructs Storage object.
 func New(path string) (*Storage, error) {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
@@ -25,6 +27,7 @@ func New(path string) (*Storage, error) {
 	return &Storage{db: db}, nil
 }
 
+// Init creates tables in database.
 func (s *Storage) Init(ctx context.Context) error {
 	queries := []query{
 		{
@@ -71,10 +74,12 @@ func (s *Storage) Init(ctx context.Context) error {
 	return nil
 }
 
+// Close closes storage.
 func (s *Storage) Close() error {
 	return s.db.Close()
 }
 
+// ListAll returns id, meta for all records.
 func (s *Storage) ListAll(ctx context.Context, uid models.UserID) (models.RecordsEncrypted, error) {
 	result := models.RecordsEncrypted{}
 	for _, recType := range []models.RecordType{
@@ -102,6 +107,7 @@ func (s *Storage) ListAll(ctx context.Context, uid models.UserID) (models.Record
 	return result, nil
 }
 
+// List returns records id, meta by type.
 func (s *Storage) List(ctx context.Context, uid models.UserID, t models.RecordType) (models.RecordsEncrypted, error) {
 	args := []interface{}{uid}
 	rows, err := s.db.QueryContext(ctx, actions[t][actionList].query, args...)
@@ -161,6 +167,7 @@ func (s *Storage) List(ctx context.Context, uid models.UserID, t models.RecordTy
 	return result, nil
 }
 
+// Get returns object by id, userid and record type.
 func (s *Storage) Get(
 	ctx context.Context, uid models.UserID, t models.RecordType,
 	id models.ID,
@@ -196,6 +203,7 @@ func (s *Storage) Get(
 	return rec, nil
 }
 
+// Delete deletes object by id, userid and record type.
 func (s *Storage) Delete(ctx context.Context, uid models.UserID, t models.RecordType, id models.ID) error {
 	args := []interface{}{id, uid}
 	res, err := s.db.ExecContext(ctx, actions[t][actionDelete].query, args...)
@@ -212,6 +220,7 @@ func (s *Storage) Delete(ctx context.Context, uid models.UserID, t models.Record
 	return nil
 }
 
+// Update updates object by id, userid and record type.
 func (s *Storage) Update(
 	ctx context.Context, uid models.UserID, t models.RecordType, id models.ID,
 	record models.RecordEncrypted,
@@ -243,6 +252,7 @@ func (s *Storage) Update(
 	return nil
 }
 
+// Add adds encrypted record for user by record type.
 func (s *Storage) Add(
 	ctx context.Context, uid models.UserID, t models.RecordType,
 	record models.RecordEncrypted,
@@ -269,6 +279,7 @@ func (s *Storage) Add(
 	return nil
 }
 
+// IsExist returns true if record exists.
 func (s *Storage) IsExist(ctx context.Context, uid models.UserID, t models.RecordType, id models.ID) (bool, error) {
 	tableName := tables(t)
 	if tableName == tableUnknown {
@@ -313,6 +324,7 @@ func (s *Storage) isOwner(ctx context.Context, uid models.UserID, t models.Recor
 	return realUID == int(uid), nil
 }
 
+// Users returns all registered users.
 func (s *Storage) Users(ctx context.Context) ([]models.User, error) {
 	q := query{
 		query: queryWithTable("SELECT id, cn FROM %s ORDER BY id", tableUsers),
@@ -345,6 +357,7 @@ func (s *Storage) Users(ctx context.Context) ([]models.User, error) {
 	return users, nil
 }
 
+// NewUser creates new user.
 func (s *Storage) NewUser(ctx context.Context, cn string) (models.UserID, error) {
 	q := query{
 		query: queryWithTable("INSERT INTO %s(cn) VALUES (?) RETURNING id", tableUsers),
@@ -358,6 +371,7 @@ func (s *Storage) NewUser(ctx context.Context, cn string) (models.UserID, error)
 	return result, nil
 }
 
+// IsUserExist returns true if user exists in database.
 func (s *Storage) IsUserExist(ctx context.Context, user models.UserID) (bool, error) {
 	q := query{
 		query: queryWithTable("SELECT COUNT(*) FROM %s WHERE id = ?", tableUsers),
@@ -370,6 +384,7 @@ func (s *Storage) IsUserExist(ctx context.Context, user models.UserID) (bool, er
 	return count > 0, nil
 }
 
+// GetUserID returns uid by common name.
 func (s *Storage) GetUserID(ctx context.Context, cn string) (models.UserID, error) {
 	q := query{
 		query: queryWithTable("SELECT id FROM %s WHERE cn = ?", tableUsers),
