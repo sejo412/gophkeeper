@@ -1,0 +1,73 @@
+edition = "2023";
+
+package gophkeeper;
+
+option go_package = "gophkeeper/proto";
+
+import "google/protobuf/empty.proto";
+
+enum RecordType {
+  UNKNOWN = 0;
+  PASSWORD = 1;
+  TEXT = 2;
+  BIN = 3;
+  BANK = 4;
+}
+
+message RegisterRequest {
+  bytes cert_request = 1;
+}
+
+message RegisterResponse {
+  reserved 1;
+  bytes ca_certificate = 2;
+  bytes client_certificate = 3;
+}
+
+message ListRequest {
+  RecordType type = 1;
+}
+
+message ListResponse {
+  bytes records = 1;
+}
+
+message AddRecordRequest {
+  RecordType type = 1;
+  bytes record = 2;
+}
+
+message GetRecordRequest {
+  RecordType type = 1;
+  int64 record_number = 2;
+}
+
+message GetRecordResponse {
+  RecordType type = 1;
+  bytes record = 2;
+  string error = 3;
+}
+
+message UpdateRecordRequest {
+  RecordType type = 1;
+  int64 record_number = 2;
+  bytes record = 3;
+}
+
+message DeleteRecordRequest {
+  RecordType type = 1;
+  int64 record_number = 2;
+}
+
+service Public {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+}
+
+service Private {
+  rpc ListAll(google.protobuf.Empty) returns (ListResponse);
+  rpc List(ListRequest) returns (ListResponse);
+  rpc Create(AddRecordRequest) returns (google.protobuf.Empty);
+  rpc Read(GetRecordRequest) returns (GetRecordResponse);
+  rpc Update(UpdateRecordRequest) returns (google.protobuf.Empty);
+  rpc Delete(DeleteRecordRequest) returns (google.protobuf.Empty);
+}

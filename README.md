@@ -16,42 +16,35 @@ GRPC:
 
 - users
   - id (int)
+  - uid (int)
   - cn (text)
-
-- usersmap
-  - id
-  - uid
 
 - passwords
   - id
+  - uid (int)
   - login (blob)
   - password (blob)
   - meta (blob)
 
-- passwordsmap
-
 - text
   - id
+  - uid (int)
   - text (blob)
   - meta (blob)
 
-- textmap
-
 - bin
   - id
+  - uid (int)
   - data (blob)
   - meta (blob)
 
-- binmap
-
 - bank
   - id
+  - uid (int)
   - number
   - date
   - cvv
   - meta
-
-- bankmap
 
 ## Клиент
 
