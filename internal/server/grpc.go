@@ -232,8 +232,16 @@ func (sp *GRPCPublic) Register(ctx context.Context, in *pb.RegisterRequest) (*pb
 func loggerInterceptor() logging.Logger {
 	return logging.LoggerFunc(
 		func(ctx context.Context, lvl logging.Level, msg string, keyvals ...any) {
-			uid := ctx.Value(ctxUIDKey).(int)
-			cn := ctx.Value(ctxCNKey).(string)
+			uidCtx := ctx.Value(ctxUIDKey)
+			uid := -1
+			if uidCtx != nil {
+				uid = uidCtx.(int)
+			}
+			cnCtx := ctx.Value(ctxCNKey)
+			cn := ""
+			if cnCtx != nil {
+				cn = cnCtx.(string)
+			}
 			keyvals = append(keyvals, slog.String("User", cn), slog.Int("UserID", uid))
 			slog.Log(ctx, slog.Level(lvl), msg, keyvals...)
 		},

@@ -40,8 +40,7 @@ proto:
 
 .PHONY: cover
 cover:
-	#go test ./... -coverprofile=./coverage.out -covermode=atomic -coverpkg=./...
-	go test -v -tags integration -coverprofile=coverage.out ./...
+	go test -v -tags integration -coverprofile=coverage.out $$(go list ./... | grep -E -v "/(proto|pkg|cmd)")
 	go tool cover -html=coverage.out -o coverage.html
 	go tool cover -func=coverage.out
 	@rm -f coverage.out
