@@ -22,18 +22,21 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
+// Server main application object.
 type Server struct {
 	config      *Config
 	grpcPublic  *GRPCPublic
 	grpcPrivate *GRPCPrivate
 }
 
+// NewServer constructs object Server with predefined Config.
 func NewServer(opts Config) *Server {
 	return &Server{
 		config: NewConfigWithOptions(opts),
 	}
 }
 
+// Init destroys all presents data and creates new data (Storage and certificates).
 func (s *Server) Init() error {
 	ctx := context.Background()
 	if s.config == nil {
@@ -66,6 +69,7 @@ func (s *Server) Init() error {
 	return nil
 }
 
+// Start starts main application.
 func (s *Server) Start() error {
 	// open storage
 	store, err := sqlite.New(filepath.Join(s.config.CacheDir, constants.DBFilename))

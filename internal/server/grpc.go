@@ -49,6 +49,7 @@ type privateConfig struct {
 	store Storage
 }
 
+// NewGRPCPublic constructs new GRPCPublic object for Server.
 func NewGRPCPublic(config Config) (*GRPCPublic, error) {
 	cfg, err := newPublicConfig(
 		config.PublicPort,
@@ -64,6 +65,7 @@ func NewGRPCPublic(config Config) (*GRPCPublic, error) {
 	}, nil
 }
 
+// NewGRPCPrivate constructs new GRPCPrivate object for Server.
 func NewGRPCPrivate(config Config) *GRPCPrivate {
 	cfg := newPrivateConfig(
 		config.PrivatePort,
@@ -93,16 +95,19 @@ func newPrivateConfig(port int, store *Storage) privateConfig {
 	}
 }
 
+// GRPCPublic implements proto public server.
 type GRPCPublic struct {
 	pb.UnimplementedPublicServer
 	config publicConfig
 }
 
+// GRPCPrivate implements proto private server.
 type GRPCPrivate struct {
 	pb.UnimplementedPrivateServer
 	config privateConfig
 }
 
+// ListAll returns ID and Meta for all records by User ID.
 func (s *GRPCPrivate) ListAll(ctx context.Context, in *emptypb.Empty) (
 	*pb.ListResponse,
 	error,
@@ -122,6 +127,7 @@ func (s *GRPCPrivate) ListAll(ctx context.Context, in *emptypb.Empty) (
 	return &pb.ListResponse{Records: data}, nil
 }
 
+// List returns ID and Meta for all records by User ID and models.RecordType.
 func (s *GRPCPrivate) List(ctx context.Context, in *pb.ListRequest) (*pb.ListResponse, error) {
 	ctxUID, _ := ctx.Value(ctxUIDKey).(int)
 	uid := models.UserID(ctxUID)
@@ -138,6 +144,7 @@ func (s *GRPCPrivate) List(ctx context.Context, in *pb.ListRequest) (*pb.ListRes
 	return &pb.ListResponse{Records: data}, nil
 }
 
+// Create creates new models.RecordEncrypted for User by models.RecordType.
 func (s *GRPCPrivate) Create(ctx context.Context, in *pb.AddRecordRequest) (*emptypb.Empty, error) {
 	ctxUID, _ := ctx.Value(ctxUIDKey).(int)
 	uid := models.UserID(ctxUID)
@@ -153,6 +160,7 @@ func (s *GRPCPrivate) Create(ctx context.Context, in *pb.AddRecordRequest) (*emp
 	return &emptypb.Empty{}, nil
 }
 
+// Read returns models.Record for User by models.RecordType and models.ID.
 func (s *GRPCPrivate) Read(ctx context.Context, in *pb.GetRecordRequest) (*pb.GetRecordResponse, error) {
 	ctxUID, _ := ctx.Value(ctxUIDKey).(int)
 	uid := models.UserID(ctxUID)
@@ -173,6 +181,7 @@ func (s *GRPCPrivate) Read(ctx context.Context, in *pb.GetRecordRequest) (*pb.Ge
 	}, nil
 }
 
+// Update updates models.Record for User by models.RecordType and models.ID.
 func (s *GRPCPrivate) Update(ctx context.Context, in *pb.UpdateRecordRequest) (*emptypb.Empty, error) {
 	ctxUID, _ := ctx.Value(ctxUIDKey).(int)
 	uid := models.UserID(ctxUID)
@@ -191,6 +200,7 @@ func (s *GRPCPrivate) Update(ctx context.Context, in *pb.UpdateRecordRequest) (*
 	return &emptypb.Empty{}, nil
 }
 
+// Delete deletes models.Record for User by models.RecordType and models.ID.
 func (s *GRPCPrivate) Delete(ctx context.Context, in *pb.DeleteRecordRequest) (*emptypb.Empty, error) {
 	ctxUID, _ := ctx.Value(ctxUIDKey).(int)
 	uid := models.UserID(ctxUID)
@@ -204,6 +214,7 @@ func (s *GRPCPrivate) Delete(ctx context.Context, in *pb.DeleteRecordRequest) (*
 	return &emptypb.Empty{}, nil
 }
 
+// Register creates new models.User by certificate request.
 func (sp *GRPCPublic) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.RegisterResponse, error) {
 	msg := new(string)
 	certRequest, err := certs.BinaryToRequest(in.GetCertRequest())

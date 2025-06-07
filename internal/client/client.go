@@ -21,6 +21,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// Client is a main client object.
 type Client struct {
 	config     *Config
 	client     pb.PrivateClient
@@ -28,10 +29,12 @@ type Client struct {
 	privateKey *rsa.PrivateKey
 }
 
+// NewClient constructs Client object.
 func NewClient(config Config) *Client {
 	return &Client{config: NewConfigWithOptions(config)}
 }
 
+// Register registers new client on the server with creating RSA-keys and certificates.
 func (c *Client) Register(name string) error {
 	if err := os.MkdirAll(c.config.CacheDir, 0700); err != nil {
 		return fmt.Errorf("failed to create cache dir: %w", err)
@@ -87,6 +90,7 @@ func (c *Client) Register(name string) error {
 	return nil
 }
 
+// Run runs application's interactive mode.
 func (c *Client) Run() error {
 	tlsCfg, err := tlsConfig(c.config.CacheDir)
 	if err != nil {
@@ -95,7 +99,8 @@ func (c *Client) Run() error {
 	if err = c.SetRSAKeys(); err != nil {
 		return fmt.Errorf("failed to set RSA keys: %w", err)
 	}
-	grpcClient, err := grpc.NewClient(c.config.PrivateAddress, grpc.WithTransportCredentials(credentials.NewTLS(tlsCfg)))
+	grpcClient, err := grpc.NewClient(c.config.PrivateAddress,
+		grpc.WithTransportCredentials(credentials.NewTLS(tlsCfg)))
 	if err != nil {
 		return fmt.Errorf("failed to create private client: %w", err)
 	}
@@ -120,6 +125,7 @@ func (c *Client) Run() error {
 	return nil
 }
 
+// SetRSAKeys sets readable keys to Client object.
 func (c *Client) SetRSAKeys() error {
 	derKey, err := os.ReadFile(filepath.Join(c.config.CacheDir, constants.CertClientPrivateFilename))
 	if err != nil {

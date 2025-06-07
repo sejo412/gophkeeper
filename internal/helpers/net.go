@@ -2,6 +2,7 @@ package helpers
 
 import "net"
 
+// MyIPAddresses returns slice of active ip addresses on PC.
 func MyIPAddresses() []net.IP {
 	ips := make([]net.IP, 0)
 	ips = append(ips, net.IPv4(127, 0, 0, 1), net.IPv6loopback)

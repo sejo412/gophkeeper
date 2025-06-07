@@ -14,22 +14,36 @@ import (
 	"github.com/sejo412/gophkeeper/pkg/certs"
 )
 
+// Storage interface supports by server.
 type Storage interface {
+	// Init creates and fills store with init data.
 	Init(ctx context.Context) error
+	// Close closes connection.
 	Close() error
+	// ListAll returns all id and meta by owner.
 	ListAll(ctx context.Context, uid models.UserID) (models.RecordsEncrypted, error)
+	// List returns all id and meta by owner and type of record.
 	List(ctx context.Context, uid models.UserID, t models.RecordType) (models.RecordsEncrypted, error)
+	// Get returns encrypted data of Record by owner and ID.
 	Get(ctx context.Context, uid models.UserID, t models.RecordType, id models.ID) (models.RecordEncrypted, error)
+	// Add creates new Record for User.
 	Add(ctx context.Context, uid models.UserID, t models.RecordType, record models.RecordEncrypted) error
+	// Update updates Record for User by Record ID.
 	Update(
 		ctx context.Context, uid models.UserID, t models.RecordType, id models.ID,
 		record models.RecordEncrypted,
 	) error
+	// Delete deletes Record.
 	Delete(ctx context.Context, uid models.UserID, t models.RecordType, id models.ID) error
+	// IsExist returns true if Record exists in Storage.
 	IsExist(ctx context.Context, user models.UserID, t models.RecordType, id models.ID) (bool, error)
+	// Users returns all registered users.
 	Users(ctx context.Context) ([]models.User, error)
+	// NewUser creates new user in Storage.
 	NewUser(ctx context.Context, cn string) (models.UserID, error)
+	// IsUserExist return true if user registered in Storage.
 	IsUserExist(ctx context.Context, uid models.UserID) (bool, error)
+	// GetUserID returns User ID by CommonName.
 	GetUserID(ctx context.Context, cn string) (models.UserID, error)
 }
 
