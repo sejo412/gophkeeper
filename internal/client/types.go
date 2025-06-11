@@ -80,6 +80,7 @@ const (
 	FieldText
 	FieldData
 	FieldNumber
+	FieldName
 	FieldDate
 	FieldCVV
 	FieldMeta
@@ -92,6 +93,7 @@ const (
 	FieldTextName     string = "Text"
 	FieldDataName     string = "Data"
 	FieldNumberName   string = "Number"
+	FieldNameName     string = "Owner"
 	FieldDateName     string = "Date"
 	FieldCVVName      string = "CVV"
 	FieldMetaName     string = "Meta"
@@ -111,6 +113,8 @@ func (f Field) String() string {
 		return FieldDataName
 	case FieldNumber:
 		return FieldNumberName
+	case FieldName:
+		return FieldNameName
 	case FieldDate:
 		return FieldDateName
 	case FieldCVV:
@@ -269,6 +273,7 @@ func fields(t models.RecordType) []Field {
 	case models.RecordBank:
 		return []Field{
 			FieldNumber,
+			FieldName,
 			FieldDate,
 			FieldCVV,
 			FieldMeta,

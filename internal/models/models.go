@@ -111,6 +111,7 @@ type BinEncrypted struct {
 type Bank struct {
 	ID     ID
 	Number string
+	Name   string
 	Date   string
 	Cvv    string
 	Meta   Meta
@@ -120,6 +121,7 @@ type Bank struct {
 type BankEncrypted struct {
 	ID     ID
 	Number Encrypted
+	Name   Encrypted
 	Date   Encrypted
 	Cvv    Encrypted
 	Meta   Encrypted

@@ -61,7 +61,8 @@ func (s *Storage) Init(ctx context.Context) error {
 		{
 			table: tableBanks,
 			query: queryWithTable(
-				"CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, uid, INTEGER NOT NULL, number BLOB, date BLOB, cvv BLOB, meta BLOB)",
+				"CREATE TABLE IF NOT EXISTS %s(id INTEGER PRIMARY KEY, uid INTEGER NOT NULL, number BLOB, "+
+					"name BLOB, date BLOB, cvv BLOB, meta BLOB)",
 				tableBanks,
 			),
 		},
@@ -189,7 +190,7 @@ func (s *Storage) Get(
 	case models.RecordBin:
 		err = row.Scan(&rec.Bin.ID, &rec.Bin.Data, &rec.Bin.Meta)
 	case models.RecordBank:
-		err = row.Scan(&rec.Bank.ID, &rec.Bank.Number, &rec.Bank.Date, &rec.Bank.Cvv)
+		err = row.Scan(&rec.Bank.ID, &rec.Bank.Number, &rec.Bank.Name, &rec.Bank.Date, &rec.Bank.Cvv, &rec.Bank.Meta)
 	default:
 		err = errors.New("unknown record")
 	}
@@ -234,7 +235,10 @@ func (s *Storage) Update(
 	case models.RecordBin:
 		args = []interface{}{record.Bin.Data, record.Bin.Meta, id, uid}
 	case models.RecordBank:
-		args = []interface{}{record.Bank.Number, record.Bank.Date, record.Bank.Cvv, record.Bank.Meta, id, uid}
+		args = []interface{}{
+			record.Bank.Number, record.Bank.Name, record.Bank.Date, record.Bank.Cvv, record.Bank.Meta,
+			id, uid,
+		}
 	default:
 		return errors.New("invalid record type")
 	}
@@ -269,7 +273,7 @@ func (s *Storage) Add(
 	case models.RecordBin:
 		args = []interface{}{uid, record.Bin.Data, record.Bin.Meta}
 	case models.RecordBank:
-		args = []interface{}{uid, record.Bank.Number, record.Bank.Date, record.Bank.Cvv, record.Bank.Meta}
+		args = []interface{}{uid, record.Bank.Number, record.Bank.Name, record.Bank.Date, record.Bank.Cvv, record.Bank.Meta}
 	default:
 		return fmt.Errorf("invalid record type: %q", t)
 	}

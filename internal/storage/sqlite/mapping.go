@@ -56,13 +56,16 @@ var actions = map[models.RecordType]map[action]query{
 	},
 	models.RecordBank: {
 		actionCreate: {
-			query: queryWithTable("INSERT INTO %s(uid, number, date, cvv, meta) VALUES (?, ?, ?, ?, ?)", tableBanks),
+			query: queryWithTable("INSERT INTO %s(uid, number, name, date, cvv, meta) VALUES (?, ?, ?, ?, ?, ?)", tableBanks),
 		},
 		actionRead: {
-			query: queryWithTable("SELECT id, number, date, cvv, meta FROM %s WHERE id = ? AND uid = ?", tableBanks),
+			query: queryWithTable("SELECT id, number, name, date, cvv, meta FROM %s WHERE id = ? AND uid = ?", tableBanks),
 		},
 		actionUpdate: {
-			query: queryWithTable("UPDATE %s SET number = ?, date =?, cvv = ? meta = ? WHERE id = ? AND uid = ?", tableBanks),
+			query: queryWithTable(
+				"UPDATE %s SET number = ?, name = ?, date = ?, cvv = ? meta = ? WHERE id = ? AND uid = ?",
+				tableBanks,
+			),
 		},
 		actionDelete: {
 			query: queryWithTable("DELETE FROM %s WHERE id = ? AND uid = ?", tableBanks),

@@ -91,6 +91,8 @@ func readRecord(ctx context.Context, c *Client, t models.RecordType, scanner *bu
 			switch field {
 			case FieldNumber:
 				valDec, err = crypt.DecryptWithPrivateKey(c.privateKey, record.Bank.Number)
+			case FieldName:
+				valDec, err = crypt.DecryptWithPrivateKey(c.privateKey, record.Bank.Name)
 			case FieldDate:
 				valDec, err = crypt.DecryptWithPrivateKey(c.privateKey, record.Bank.Date)
 			case FieldCVV:
@@ -304,6 +306,8 @@ func writeRecord(_ context.Context, c *Client, t models.RecordType, scanner *buf
 			switch field {
 			case FieldNumber:
 				encrypted.Bank.Number = valEnc
+			case FieldName:
+				encrypted.Bank.Name = valEnc
 			case FieldDate:
 				encrypted.Bank.Date = valEnc
 			case FieldCVV:
