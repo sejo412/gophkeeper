@@ -165,6 +165,9 @@ func (s *Storage) List(ctx context.Context, uid models.UserID, t models.RecordTy
 		default:
 		}
 	}
+	if err = rows.Err(); err != nil {
+		return models.RecordsEncrypted{}, fmt.Errorf("failed iterate %s: %w", t.String(), rows.Err())
+	}
 	return result, nil
 }
 
@@ -356,6 +359,9 @@ func (s *Storage) Users(ctx context.Context) ([]models.User, error) {
 				Cn: cn,
 			},
 		)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed iterate users: %w", err)
 	}
 
 	return users, nil
